@@ -12,6 +12,7 @@ class AppTheme {
       secondary: AppColors.secondaryButton,
       error: AppColors.alert,
       surface: AppColors.card,
+      onSurface: AppColors.primaryText,
     );
 
     return ThemeData(
@@ -24,19 +25,47 @@ class AppTheme {
       ),
       cardTheme: const CardThemeData(
         color: AppColors.card,
-        elevation: 2,
+        elevation: 4,
         margin: EdgeInsets.all(16),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primaryButton,
-          foregroundColor: AppColors.primaryText,
+          foregroundColor: AppColors.primaryButtonText,
         ),
       ),
       iconTheme: const IconThemeData(color: AppColors.activeIcon),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.fieldBackground,
+        labelStyle: const TextStyle(color: AppColors.secondaryText),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.outline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: AppColors.appBar,
+            width: 1.5,
+          ),
+        ),
+      ),
       textTheme: const TextTheme(
+        displaySmall: TextStyle(
+          color: AppColors.appBar,
+          fontWeight: FontWeight.w700,
+        ),
+        headlineSmall: TextStyle(
+          color: AppColors.primaryText,
+          fontWeight: FontWeight.w700,
+        ),
+        titleMedium: TextStyle(
+          color: AppColors.primaryText,
+          fontWeight: FontWeight.w600,
+        ),
         bodyLarge: TextStyle(color: AppColors.primaryText),
-        bodyMedium: TextStyle(color: AppColors.primaryText),
+        bodyMedium: TextStyle(color: AppColors.secondaryText),
       ),
     );
   }

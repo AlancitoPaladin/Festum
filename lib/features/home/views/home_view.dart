@@ -1,6 +1,10 @@
+import 'package:festum/app/router/app_routes.dart';
+import 'package:festum/core/di/app_locator.dart';
+import 'package:festum/core/services/auth_state_service.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/features/home/viewmodels/home_viewmodel.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:stacked/stacked.dart';
 
 class HomeView extends StackedView<HomeViewModel> {
@@ -9,7 +13,21 @@ class HomeView extends StackedView<HomeViewModel> {
   @override
   Widget builder(BuildContext context, HomeViewModel viewModel, Widget? child) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Festum')),
+      appBar: AppBar(
+        title: const Text('Festum'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await locator<AuthStateService>().signOut();
+              if (!context.mounted) {
+                return;
+              }
+              context.go(AppRoutes.login);
+            },
+            child: const Text('Salir'),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

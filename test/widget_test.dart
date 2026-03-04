@@ -6,16 +6,18 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:festum/app/app.dart';
 import 'package:festum/core/di/app_locator.dart';
 
 void main() {
   testWidgets('Festum app smoke test', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
     await setupLocator();
     await tester.pumpWidget(const FestumApp());
+    await tester.pump();
 
-    expect(find.text('Festum'), findsOneWidget);
-    expect(find.text('Setup inicial listo'), findsOneWidget);
+    expect(find.text('Elegancia y orden para tus reservaciones'), findsOneWidget);
   });
 }
