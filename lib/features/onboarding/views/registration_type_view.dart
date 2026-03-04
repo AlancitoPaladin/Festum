@@ -98,6 +98,16 @@ class RegistrationTypeView extends StatelessWidget {
                                             .replaceFirst(':role', 'cliente'),
                                       ),
                                     ),
+                                    const SizedBox(height: 14),
+                                    Align(
+                                      alignment: Alignment.center,
+                                      child: TextButton(
+                                        onPressed: () => context.go(AppRoutes.login),
+                                        child: const Text(
+                                          '¿Ya tienes cuenta? Inicia sesión',
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),

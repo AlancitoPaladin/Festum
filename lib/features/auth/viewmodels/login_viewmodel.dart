@@ -26,11 +26,14 @@ class LoginViewModel extends BaseViewModel {
   Future<String?> submit() async {
     setBusy(true);
     try {
-      final String accessToken = await _authRepository.login(
+      final session = await _authRepository.login(
         email: emailController.text.trim(),
         password: passwordController.text,
       );
-      await _authStateService.signIn(accessToken);
+      await _authStateService.signIn(
+        accessToken: session.accessToken,
+        role: session.role,
+      );
       return null;
     } catch (error) {
       return AuthRepository.mapApiError(error);

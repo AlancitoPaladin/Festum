@@ -1,12 +1,14 @@
 import 'package:dio/dio.dart';
+import 'package:festum/core/models/account_role.dart';
 import 'package:festum/core/network/api_client.dart';
+import 'package:festum/features/auth/models/auth_session.dart';
 
 class AuthRepository {
   AuthRepository(this._apiClient);
 
   final ApiClient _apiClient;
 
-  Future<String> login({
+  Future<AuthSession> login({
     required String email,
     required String password,
   }) async {
@@ -15,10 +17,10 @@ class AuthRepository {
       password: password,
     );
 
-    return _extractToken(response);
+    return _extractSession(response);
   }
 
-  Future<String> register({
+  Future<AuthSession> register({
     required String firstName,
     required String lastName,
     required String email,
@@ -35,11 +37,12 @@ class AuthRepository {
       role: role,
     );
 
-    return _extractToken(response);
+    return _extractSession(response);
   }
 
-  Future<void> me() async {
-    await _apiClient.me();
+  Future<AccountRole> me() async {
+    final Map<String, dynamic> response = await _apiClient.me();
+    return _extractRoleFromUser(response);
   }
 
   static String mapApiError(Object error) {
@@ -62,11 +65,30 @@ class AuthRepository {
     return 'Ocurrió un error inesperado.';
   }
 
-  String _extractToken(Map<String, dynamic> response) {
+  AuthSession _extractSession(Map<String, dynamic> response) {
     final String accessToken = (response['access_token'] ?? '').toString();
     if (accessToken.isEmpty) {
       throw const FormatException('Token inválido en respuesta');
     }
-    return accessToken;
+
+    return AuthSession(
+      accessToken: accessToken,
+      role: _extractRoleFromUser(response),
+    );
+  }
+
+  AccountRole _extractRoleFromUser(Map<String, dynamic> response) {
+    final dynamic user = response['user'];
+    if (user is! Map<String, dynamic>) {
+      throw const FormatException('Usuario inválido en respuesta');
+    }
+
+    final String roleValue = (user['role'] ?? '').toString();
+    final AccountRole? role = AccountRole.fromStorage(roleValue);
+    if (role == null) {
+      throw const FormatException('Rol inválido en respuesta');
+    }
+
+    return role;
   }
 }

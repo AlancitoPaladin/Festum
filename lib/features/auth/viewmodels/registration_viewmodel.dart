@@ -42,7 +42,7 @@ class RegistrationViewModel extends BaseViewModel {
   Future<String?> submit() async {
     setBusy(true);
     try {
-      final String accessToken = await _authRepository.register(
+      final session = await _authRepository.register(
         firstName: firstNameController.text.trim(),
         lastName: lastNameController.text.trim(),
         email: emailController.text.trim(),
@@ -52,7 +52,10 @@ class RegistrationViewModel extends BaseViewModel {
       );
 
       await _registrationStateService.completeRegistration(role);
-      await _authStateService.signIn(accessToken);
+      await _authStateService.signIn(
+        accessToken: session.accessToken,
+        role: session.role,
+      );
       return null;
     } catch (error) {
       return AuthRepository.mapApiError(error);

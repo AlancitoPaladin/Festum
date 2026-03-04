@@ -1,6 +1,7 @@
 import 'package:festum/app/router/app_router.dart';
 import 'package:dio/dio.dart';
 import 'package:festum/core/config/app_environment.dart';
+import 'package:festum/core/models/account_role.dart';
 import 'package:festum/core/network/api_client.dart';
 import 'package:festum/core/network/auth_interceptor.dart';
 import 'package:festum/core/network/session_interceptor.dart';
@@ -86,10 +87,13 @@ Future<void> _validateExistingSession() async {
   }
 
   try {
-    await locator<AuthRepository>().me();
+    final AccountRole role = await locator<AuthRepository>().me();
+    await authStateService.syncRole(role);
   } on DioException catch (error) {
     if (error.response?.statusCode == 401) {
       await authStateService.signOut();
     }
+  } on FormatException {
+    await authStateService.signOut();
   }
 }
