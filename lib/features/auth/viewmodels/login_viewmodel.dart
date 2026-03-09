@@ -4,10 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 
 class LoginViewModel extends BaseViewModel {
-  LoginViewModel(
-    this._authRepository,
-    this._authStateService,
-  );
+  LoginViewModel(this._authRepository, this._authStateService);
 
   final AuthRepository _authRepository;
   final AuthStateService _authStateService;
@@ -33,6 +30,7 @@ class LoginViewModel extends BaseViewModel {
       await _authStateService.signIn(
         accessToken: session.accessToken,
         role: session.role,
+        displayName: session.displayName,
       );
       return null;
     } catch (error) {

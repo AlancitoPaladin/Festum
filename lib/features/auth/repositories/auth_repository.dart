@@ -74,6 +74,7 @@ class AuthRepository {
     return AuthSession(
       accessToken: accessToken,
       role: _extractRoleFromUser(response),
+      displayName: _extractDisplayNameFromUser(response),
     );
   }
 
@@ -90,5 +91,32 @@ class AuthRepository {
     }
 
     return role;
+  }
+
+  String? _extractDisplayNameFromUser(Map<String, dynamic> response) {
+    final dynamic user = response['user'];
+    if (user is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final String firstName = (user['first_name'] ?? user['firstName'] ?? '')
+        .toString()
+        .trim();
+    final String lastName = (user['last_name'] ?? user['lastName'] ?? '')
+        .toString()
+        .trim();
+    final String fullName = <String>[
+      firstName,
+      lastName,
+    ].where((String part) => part.isNotEmpty).join(' ').trim();
+
+    if (fullName.isNotEmpty) {
+      return fullName;
+    }
+
+    final String fallbackName = (user['name'] ?? user['username'] ?? '')
+        .toString()
+        .trim();
+    return fallbackName.isEmpty ? null : fallbackName;
   }
 }

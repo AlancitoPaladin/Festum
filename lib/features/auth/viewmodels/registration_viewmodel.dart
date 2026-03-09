@@ -55,6 +55,7 @@ class RegistrationViewModel extends BaseViewModel {
       await _authStateService.signIn(
         accessToken: session.accessToken,
         role: session.role,
+        displayName: session.displayName,
       );
       return null;
     } catch (error) {
