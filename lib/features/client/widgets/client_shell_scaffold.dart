@@ -1,6 +1,7 @@
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/services/auth_state_service.dart';
+import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/features/client/models/client_tab.dart';
 import 'package:festum/features/client/widgets/client_bottom_nav_bar.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,9 @@ class ClientShellScaffold extends StatefulWidget {
     required this.body,
     this.title,
     this.showAppBar = true,
+    this.showBackButton = false,
+    this.onBackPressed,
+    this.onRefresh,
     super.key,
   });
 
@@ -20,6 +24,9 @@ class ClientShellScaffold extends StatefulWidget {
   final Widget body;
   final String? title;
   final bool showAppBar;
+  final bool showBackButton;
+  final VoidCallback? onBackPressed;
+  final RefreshCallback? onRefresh;
 
   @override
   State<ClientShellScaffold> createState() => _ClientShellScaffoldState();
@@ -34,23 +41,51 @@ class _ClientShellScaffoldState extends State<ClientShellScaffold> {
       appBar: widget.showAppBar
           ? AppBar(
               title: Text(widget.title ?? widget.currentTab.label),
+              leading: widget.showBackButton
+                  ? IconButton(
+                      tooltip: 'Volver',
+                      color: AppColors.appBarText,
+                      onPressed: () {
+                        final VoidCallback? onBackPressed = widget.onBackPressed;
+                        if (onBackPressed != null) {
+                          onBackPressed();
+                          return;
+                        }
+                        if (context.canPop()) {
+                          context.pop();
+                          return;
+                        }
+                        context.go(AppRoutes.clientServices);
+                      },
+                      icon: const Icon(Icons.arrow_back_rounded),
+                    )
+                  : null,
               actions: <Widget>[
-                TextButton(
+                IconButton(
+                  tooltip: 'Cerrar sesión',
+                  color: AppColors.appBarText,
                   onPressed: () async {
+                    final bool confirmed = await _confirmSignOut(context);
+                    if (!confirmed || !context.mounted) {
+                      return;
+                    }
                     await locator<AuthStateService>().signOut();
                     if (!context.mounted) {
                       return;
                     }
                     context.go(AppRoutes.login);
                   },
-                  child: const Text('Salir'),
+                  icon: const Icon(Icons.logout_rounded),
                 ),
               ],
             )
           : null,
-      body: NotificationListener<UserScrollNotification>(
-        onNotification: _onUserScroll,
-        child: widget.body,
+      body: RefreshIndicator.adaptive(
+        onRefresh: widget.onRefresh ?? _defaultRefresh,
+        child: NotificationListener<UserScrollNotification>(
+          onNotification: _onUserScroll,
+          child: widget.body,
+        ),
       ),
       bottomNavigationBar: AnimatedSlide(
         duration: const Duration(milliseconds: 240),
@@ -84,5 +119,38 @@ class _ClientShellScaffoldState extends State<ClientShellScaffold> {
       return;
     }
     context.go(tab.route);
+  }
+
+  Future<bool> _confirmSignOut(BuildContext context) async {
+    final bool? result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Cerrar sesión'),
+          content: const Text(
+            '¿Estás seguro de que quieres cerrar sesión?',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Cerrar sesión'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  Future<void> _defaultRefresh() async {
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
   }
 }

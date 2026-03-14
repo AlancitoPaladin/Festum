@@ -89,15 +89,10 @@ class AppRouter {
             return const ClientHomeView(tab: ClientTab.services);
           }
 
-          final service = ClientServiceCatalog.findService(
+          return ClientServiceDetailView(
             category: category,
             serviceId: serviceId,
           );
-          if (service == null) {
-            return ClientServicesByCategoryView(category: category);
-          }
-
-          return ClientServiceDetailView(category: category, service: service);
         },
       ),
       GoRoute(
