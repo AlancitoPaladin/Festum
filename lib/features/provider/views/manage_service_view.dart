@@ -1,3 +1,4 @@
+import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/custom_app_bar.dart';
 import 'package:festum/features/provider/models/provider_tab.dart';
@@ -5,6 +6,7 @@ import 'package:festum/features/provider/models/service_category.dart';
 import 'package:festum/features/provider/viewmodels/manage_service_viewmodel.dart';
 import 'package:festum/features/provider/widgets/provider_bottom_nav_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:stacked/stacked.dart';
 
 class ManageServiceView extends StatelessWidget {
@@ -51,7 +53,13 @@ class ManageServiceView extends StatelessWidget {
                 const SizedBox(height: 24),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: _AddProductButton(onTap: model.addProduct),
+                  child: _AddProductButton(
+                    onTap: () {
+                      context.push(
+                        AppRoutes.providerAddProductRoute(category.name),
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Expanded(
@@ -62,7 +70,14 @@ class ManageServiceView extends StatelessWidget {
                       final product = model.products[index];
                       return _ProductCard(
                         product: product,
-                        onEdit: () => model.editProduct(index),
+                        onEdit: () {
+                          context.push(
+                            AppRoutes.providerEditProductRoute(
+                              category.name,
+                              product.id,
+                            ),
+                          );
+                        },
                         onDelete: () => model.deleteProduct(index),
                       );
                     },

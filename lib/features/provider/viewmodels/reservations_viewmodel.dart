@@ -1,5 +1,22 @@
+import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/features/provider/models/service_category.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter/widgets.dart';
 import 'package:stacked/stacked.dart';
+
+class Booking {
+  final String customerName;
+  final String customerImageUrl;
+  final DateTime date;
+  final String status;
+
+  Booking({
+    required this.customerName,
+    required this.customerImageUrl,
+    required this.date,
+    required this.status,
+  });
+}
 
 class ProductReservationSummary {
   final String id;
@@ -7,7 +24,7 @@ class ProductReservationSummary {
   final ServiceCategory category;
   final String description;
   final String imageUrl;
-  final int totalReservations;
+  final Booking? nextBooking;
 
   ProductReservationSummary({
     required this.id,
@@ -15,7 +32,7 @@ class ProductReservationSummary {
     required this.category,
     required this.description,
     this.imageUrl = '',
-    this.totalReservations = 0,
+    this.nextBooking,
   });
 }
 
@@ -25,34 +42,41 @@ class ReservationsViewModel extends BaseViewModel {
       id: '1',
       productName: 'Salón Imperial',
       category: ServiceCategory.venue,
-      description: 'Salón de lujo para eventos sociales con capacidad de 200 personas.',
-      totalReservations: 5,
+      description: 'Salón de lujo para eventos sociales.',
+      nextBooking: Booking(
+        customerName: 'Mariana López',
+        customerImageUrl: 'https://i.pravatar.cc/150?u=mariana',
+        date: DateTime(2025, 8, 20),
+        status: 'Confirmada',
+      ),
     ),
     ProductReservationSummary(
       id: '2',
       productName: 'Paquete DJ Básico',
       category: ServiceCategory.dj,
-      description: 'Música para todo tipo de eventos con iluminación básica.',
-      totalReservations: 12,
+      description: 'Música e iluminación para fiestas.',
+      nextBooking: Booking(
+        customerName: 'Roberto Gómez',
+        customerImageUrl: 'https://i.pravatar.cc/150?u=roberto',
+        date: DateTime(2025, 8, 22),
+        status: 'Pendiente',
+      ),
     ),
   ];
 
   List<ProductReservationSummary> get products => _products;
-
-  void addService() {
-    // Navegar a crear servicio
-  }
 
   void deleteProduct(String id) {
     _products.removeWhere((p) => p.id == id);
     notifyListeners();
   }
 
-  void editProduct(String id) {
-    // Navegar a editar producto
+  void editProduct(BuildContext context, String id, ServiceCategory category) {
+    // CORRECCIÓN: Ahora redirige correctamente a la pantalla de edición
+    context.push(AppRoutes.providerEditProductRoute(category.name, id));
   }
 
-  void manageReservations(String id) {
-    // Navegar a la pantalla de detalle de reservas y disponibilidad por fecha
+  void manageAvailability(BuildContext context, String id, String name) {
+    context.push(AppRoutes.providerAvailabilityRoute(id, name));
   }
 }

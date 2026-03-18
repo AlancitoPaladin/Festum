@@ -1,6 +1,11 @@
+import 'package:festum/core/services/auth_state_service.dart';
 import 'package:stacked/stacked.dart';
 
 class ProviderProfileViewModel extends BaseViewModel {
+  ProviderProfileViewModel(this._authStateService);
+
+  final AuthStateService _authStateService;
+
   String get userName => 'Jair';
   String get userEmail => 'jair.provider@festum.com';
   String get businessName => 'Salón Imperial & Eventos';
@@ -13,7 +18,7 @@ class ProviderProfileViewModel extends BaseViewModel {
     // Navegación a la pantalla de reportes (pendiente)
   }
 
-  void logout() {
-    // Lógica de cerrar sesión
+  Future<void> logout() async {
+    await _authStateService.signOut();
   }
 }

@@ -1,7 +1,9 @@
+import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/custom_app_bar.dart';
 import 'package:festum/features/provider/viewmodels/availability_calendar_viewmodel.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:stacked/stacked.dart';
 
 class AvailabilityCalendarView extends StatelessWidget {
@@ -42,19 +44,22 @@ class AvailabilityCalendarView extends StatelessWidget {
   }
 
   Widget _buildCalendarHeader(AvailabilityCalendarViewModel model) {
+    final months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    final currentMonth = months[model.focusedDay.month - 1];
+    
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Junio 2025', // Simplificado para la demo
+            '$currentMonth ${model.focusedDay.year}',
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           Row(
             children: [
-              IconButton(icon: const Icon(Icons.chevron_left), onPressed: () {}),
-              IconButton(icon: const Icon(Icons.chevron_right), onPressed: () {}),
+              IconButton(icon: const Icon(Icons.chevron_left), onPressed: model.previousMonth),
+              IconButton(icon: const Icon(Icons.chevron_right), onPressed: model.nextMonth),
             ],
           ),
         ],
@@ -64,6 +69,8 @@ class AvailabilityCalendarView extends StatelessWidget {
 
   Widget _buildCalendarGrid(BuildContext context, AvailabilityCalendarViewModel model) {
     final days = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+    final daysInMonth = DateUtils.getDaysInMonth(model.focusedDay.year, model.focusedDay.month);
+    final firstDayOffset = DateTime(model.focusedDay.year, model.focusedDay.month, 1).weekday - 1;
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -81,10 +88,12 @@ class AvailabilityCalendarView extends StatelessWidget {
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
               ),
-              itemCount: 30, // Demo Junio
+              itemCount: daysInMonth + firstDayOffset,
               itemBuilder: (context, index) {
-                final day = index + 1;
-                final date = DateTime(2025, 6, day);
+                if (index < firstDayOffset) return const SizedBox.shrink();
+                
+                final day = index - firstDayOffset + 1;
+                final date = DateTime(model.focusedDay.year, model.focusedDay.month, day);
                 final status = model.getStatus(date);
                 
                 return GestureDetector(
@@ -133,9 +142,9 @@ class AvailabilityCalendarView extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _LegendItem(color: Colors.green, label: 'Disponible'),
-          _LegendItem(color: Colors.red, label: 'Reservado'),
-          _LegendItem(color: Colors.black87, label: 'Bloqueado'),
+          const _LegendItem(color: Colors.green, label: 'Disponible'),
+          const _LegendItem(color: Colors.red, label: 'Reservado'),
+          const _LegendItem(color: Colors.black87, label: 'Bloqueado'),
         ],
       ),
     );
@@ -144,9 +153,11 @@ class AvailabilityCalendarView extends StatelessWidget {
   void _showDayDetails(BuildContext context, AvailabilityCalendarViewModel model, DateTime date) {
     final status = model.getStatus(date);
     final booking = model.getBooking(date);
+    final dateStr = "${date.year}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}";
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) => Padding(
         padding: const EdgeInsets.all(24.0),
@@ -168,20 +179,36 @@ class AvailabilityCalendarView extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(booking.customerName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const Text('Evento: Boda', style: TextStyle(color: AppColors.secondaryText)),
-                      const Text('Personas: 180', style: TextStyle(color: AppColors.secondaryText)),
+                      Text('Evento: ${booking.eventType}', style: const TextStyle(color: AppColors.secondaryText)),
+                      Text('Personas: ${booking.guests}', style: const TextStyle(color: AppColors.secondaryText)),
                     ],
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              _ActionButton(label: 'Ver detalles', color: AppColors.appBar, textColor: Colors.white, onPressed: () {}),
+              _ActionButton(
+                label: 'Ver detalles', 
+                color: AppColors.appBar, 
+                textColor: Colors.white, 
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.push(AppRoutes.providerBookingDetailRoute(dateStr));
+                }
+              ),
               const SizedBox(height: 12),
               _ActionButton(label: 'Cancelar reserva', color: Colors.transparent, textColor: Colors.red, onPressed: () {}),
             ] else ...[
               Text('Fecha: ${date.day}/${date.month}/${date.year}', style: const TextStyle(color: AppColors.secondaryText)),
               const SizedBox(height: 24),
-              _ActionButton(label: 'Crear reserva manual', color: AppColors.appBar, textColor: Colors.white, onPressed: () {}),
+              _ActionButton(
+                label: 'Crear reserva manual', 
+                color: AppColors.appBar, 
+                textColor: Colors.white, 
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.push(AppRoutes.providerManualBookingRoute(dateStr));
+                }
+              ),
               const SizedBox(height: 12),
               _ActionButton(
                 label: status == DayStatus.blocked ? 'Desbloquear fecha' : 'Bloquear fecha', 

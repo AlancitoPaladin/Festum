@@ -1,102 +1,209 @@
+import 'package:festum/app/router/app_routes.dart';
+import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/theme/app_colors.dart';
+import 'package:festum/core/widgets/custom_app_bar.dart';
+import 'package:festum/features/provider/utils/provider_field_input.dart';
+import 'package:festum/features/provider/viewmodels/provider_business_info_viewmodel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
+import 'package:stacked/stacked.dart';
 
 class ProviderBusinessInfoView extends StatelessWidget {
   const ProviderBusinessInfoView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.primaryText),
-          onPressed: () => Navigator.of(context).pop(),
+    return ViewModelBuilder<ProviderBusinessInfoViewModel>.reactive(
+      viewModelBuilder: () => ProviderBusinessInfoViewModel(locator()),
+      builder: (context, model, child) => Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: CustomAppBar(
+          title: model.isOnboardingRequired
+              ? 'Completa tu negocio'
+              : 'Perfil del negocio',
+          showBackButton: !model.isOnboardingRequired,
         ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Completar información\ndel negocio',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: AppColors.primaryText,
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Ayuda a que los clientes conozcan mejor tu servicio.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.secondaryText,
-                  ),
-            ),
-            const SizedBox(height: 32),
-            _SectionTitle(title: 'Detalles del negocio'),
-            const SizedBox(height: 16),
-            _CustomTextField(
-              hintText: 'Ingrese nombre del negocio',
-            ),
-            const SizedBox(height: 16),
-            _CustomDropdownField(
-              hintText: 'Tipo de servicio',
-              items: const ['Salones', 'Mobiliario', 'Banquetes', 'Decoración'],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Seleccione tipo de servicio',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.secondaryText,
-                  ),
-            ),
-            const SizedBox(height: 24),
-            _InfoCard(
-              title: 'Ubicación',
-              subtitle: 'Ciudad o zona donde trabaja',
-            ),
-            const SizedBox(height: 16),
-            _InfoCard(
-              title: 'Área de cobertura',
-              subtitle: 'Ej: Teziutlán y municipios cercanos',
-            ),
-            const SizedBox(height: 16),
-            _CustomTextField(
-              hintText: 'Número de contacto',
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 24),
-            _SocialNetworkSection(),
-            const SizedBox(height: 32),
-            _SectionTitle(title: 'Fotos del negocio'),
-            const SizedBox(height: 16),
-            _LogoUploadCard(),
-            const SizedBox(height: 48),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.appBar,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'Guardar y continuar',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Información que verán los clientes sobre tu negocio.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.secondaryText,
+                    ),
+              ),
+              const SizedBox(height: 32),
+              
+              const _SectionLabel(label: 'Logotipo del negocio'),
+              const SizedBox(height: 16),
+              _LogoUploadCard(onTap: model.pickLogo),
+              
+              const SizedBox(height: 32),
+              const _SectionLabel(label: 'Información básica'),
+              const SizedBox(height: 12),
+              _CustomTextField(
+                hintText: 'Ingrese nombre del negocio',
+                onChanged: model.updateName,
+                inputKind: ProviderFieldInputKind.title,
+              ),
+              const SizedBox(height: 16),
+              _InfoCard(
+                title: 'Ubicación',
+                subtitle: model.businessInfo.location.isEmpty ? 'Ciudad principal donde trabajas' : model.businessInfo.location,
+                trailing: const Icon(Icons.arrow_drop_down, color: AppColors.secondaryText),
+                onTap: () {
+                  // Aquí se podría abrir un selector de ciudad y llamar a model.updateLocation
+                },
+              ),
+              const SizedBox(height: 16),
+              _InfoCard(
+                title: 'Área de cobertura',
+                subtitle: model.businessInfo.coverageArea.isEmpty ? 'Ej: Teziutlán y municipios cercanos' : model.businessInfo.coverageArea,
+                onTap: () {},
+              ),
+              const SizedBox(height: 16),
+              _CustomTextField(
+                hintText: 'Número de contacto',
+                onChanged: model.updateContactNumber,
+                keyboardType: TextInputType.phone,
+                inputKind: ProviderFieldInputKind.phone,
+              ),
+              
+              const SizedBox(height: 32),
+              const _SectionLabel(label: 'Redes y contacto'),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: _SocialField(icon: Icons.phone_outlined, hint: 'WhatsApp', iconColor: Colors.green, onChanged: model.updateWhatsapp, inputKind: ProviderFieldInputKind.phone)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _SocialField(icon: Icons.camera_alt_outlined, hint: '@instagram', iconColor: Colors.pink, onChanged: model.updateInstagram, inputKind: ProviderFieldInputKind.socialHandle)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: _SocialField(icon: Icons.facebook, hint: 'Facebook', iconColor: Colors.blue, onChanged: model.updateFacebook, inputKind: ProviderFieldInputKind.socialHandle)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _SocialField(icon: Icons.language, hint: 'Sitio web', iconColor: Colors.teal, onChanged: model.updateWebsite, inputKind: ProviderFieldInputKind.url)),
+                ],
+              ),
+              
+              const SizedBox(height: 32),
+              const _SectionLabel(label: 'Fotos del negocio'),
+              const SizedBox(height: 4),
+              const Text(
+                'Sube fotos de tu negocio o trabajos realizados',
+                style: TextStyle(color: AppColors.secondaryText, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 120,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _ImageUploadSlot(isFirst: true, onTap: model.addPhoto),
+                    const SizedBox(width: 12),
+                    const _ImageUploadSlot(),
+                    const SizedBox(width: 12),
+                    const _ImageUploadSlot(),
+                  ],
                 ),
               ),
+              const SizedBox(height: 48),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: model.isBusy
+                      ? null
+                      : () => _saveProfile(context, model),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color.fromRGBO(125, 139, 114, 1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: model.isBusy
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'Guardar perfil',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveProfile(
+    BuildContext context,
+    ProviderBusinessInfoViewModel model,
+  ) async {
+    await model.saveProfile();
+    if (!context.mounted) {
+      return;
+    }
+
+    context.go(AppRoutes.providerHome);
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  const _SectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryText),
+    );
+  }
+}
+
+class _LogoUploadCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _LogoUploadCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.backgroundElevated,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.add_a_photo_outlined, color: AppColors.secondaryText),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(width: 16),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Añadir logo del negocio', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                SizedBox(height: 2),
+                Text('Imagen principal de tu perfil', style: TextStyle(color: AppColors.secondaryText, fontSize: 12)),
+              ],
+            ),
           ],
         ),
       ),
@@ -104,76 +211,39 @@ class ProviderBusinessInfoView extends StatelessWidget {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  final String title;
-  const _SectionTitle({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        color: AppColors.primaryText,
-      ),
-    );
-  }
-}
-
 class _CustomTextField extends StatelessWidget {
   final String hintText;
+  final Function(String) onChanged;
   final TextInputType? keyboardType;
+  final ProviderFieldInputKind inputKind;
 
-  const _CustomTextField({required this.hintText, this.keyboardType});
+  const _CustomTextField({
+    required this.hintText,
+    required this.onChanged,
+    this.keyboardType,
+    this.inputKind = ProviderFieldInputKind.text,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: TextField(
-        keyboardType: keyboardType,
+        onChanged: onChanged,
+        keyboardType:
+            keyboardType ?? ProviderFieldInput.keyboardType(inputKind),
+        inputFormatters: <TextInputFormatter>[
+          ...ProviderFieldInput.formatters(inputKind),
+        ],
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: const TextStyle(color: Colors.black38),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          hintStyle: const TextStyle(color: Colors.black26),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           border: InputBorder.none,
-        ),
-      ),
-    );
-  }
-}
-
-class _CustomDropdownField extends StatelessWidget {
-  final String hintText;
-  final List<String> items;
-
-  const _CustomDropdownField({required this.hintText, required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black12),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          isExpanded: true,
-          hint: Text(hintText, style: const TextStyle(color: Colors.black38)),
-          items: items.map((String value) {
-            return DropdownMenuItem<String>(
-              value: value,
-              child: Text(value),
-            );
-          }).toList(),
-          onChanged: (_) {},
         ),
       ),
     );
@@ -183,125 +253,123 @@ class _CustomDropdownField extends StatelessWidget {
 class _InfoCard extends StatelessWidget {
   final String title;
   final String subtitle;
+  final Widget? trailing;
+  final VoidCallback onTap;
 
-  const _InfoCard({required this.title, required this.subtitle});
+  const _InfoCard({required this.title, required this.subtitle, this.trailing, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(subtitle, style: const TextStyle(color: AppColors.secondaryText, fontSize: 13)),
-        ],
-      ),
-    );
-  }
-}
-
-class _SocialNetworkSection extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text('Página web y redes sociales', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(width: 8),
-              Text('opcional', style: TextStyle(color: AppColors.secondaryText.withOpacity(0.5), fontSize: 12)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _SocialIcon(icon: Icons.phone),
-              const SizedBox(width: 12),
-              _SocialIcon(icon: Icons.video_library),
-              const SizedBox(width: 12),
-              _SocialIcon(icon: Icons.language),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Container(
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.backgroundElevated,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: const TextStyle(color: AppColors.secondaryText, fontSize: 13)),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+            if (trailing != null) ...[trailing!],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _SocialIcon extends StatelessWidget {
+class _SocialField extends StatelessWidget {
   final IconData icon;
-  const _SocialIcon({required this.icon});
+  final String hint;
+  final Color iconColor;
+  final Function(String) onChanged;
+  final ProviderFieldInputKind inputKind;
+
+  const _SocialField({
+    required this.icon,
+    required this.hint,
+    required this.iconColor,
+    required this.onChanged,
+    this.inputKind = ProviderFieldInputKind.text,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundElevated,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(icon, size: 20, color: AppColors.appBar),
-    );
-  }
-}
-
-class _LogoUploadCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black12),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.backgroundElevated,
-              borderRadius: BorderRadius.circular(8),
+          Icon(icon, color: iconColor, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              onChanged: onChanged,
+              keyboardType: ProviderFieldInput.keyboardType(inputKind),
+              inputFormatters: <TextInputFormatter>[
+                ...ProviderFieldInput.formatters(inputKind),
+              ],
+              style: const TextStyle(fontSize: 12),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: const TextStyle(color: Colors.black26, fontSize: 12),
+                border: InputBorder.none,
+                isDense: true,
+              ),
             ),
-            child: const Icon(Icons.add_a_photo_outlined, color: AppColors.secondaryText),
           ),
-          const SizedBox(width: 16),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Añadir logo del negocio', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('Añadir fotos de trabajos', style: TextStyle(color: AppColors.secondaryText, fontSize: 12)),
-            ],
-          ),
-          const Spacer(),
-          const Icon(Icons.more_horiz, color: AppColors.secondaryText),
         ],
+      ),
+    );
+  }
+}
+
+class _ImageUploadSlot extends StatelessWidget {
+  final bool isFirst;
+  final VoidCallback? onTap;
+  const _ImageUploadSlot({this.isFirst = false, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 100,
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        ),
+        child: Center(
+          child: isFirst 
+            ? const Icon(Icons.add, size: 32, color: Color.fromRGBO(125, 139, 114, 1))
+            : Container(
+                width: 80,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundElevated.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+        ),
       ),
     );
   }

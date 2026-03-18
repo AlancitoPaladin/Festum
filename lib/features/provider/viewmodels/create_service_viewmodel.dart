@@ -1,21 +1,37 @@
-import 'package:festum/features/provider/viewmodels/add_service_viewmodel.dart';
+import 'package:festum/features/provider/models/service_category.dart';
+import 'package:festum/features/provider/models/service_form_data.dart';
 import 'package:stacked/stacked.dart';
 
 class CreateServiceViewModel extends BaseViewModel {
-  ServiceCategory? _selectedCategory;
-  ServiceCategory? get selectedCategory => _selectedCategory;
+  final ServiceFormData _formData = ServiceFormData();
+  
+  ServiceFormData get formData => _formData;
+  ServiceCategory? get selectedCategory => _formData.category;
 
-  void setCategory(ServiceCategory? category) {
-    _selectedCategory = category;
+  void updateName(String value) {
+    _formData.name = value;
     notifyListeners();
   }
 
-  void saveService() {
+  void setCategory(ServiceCategory? category) {
+    _formData.category = category;
+    notifyListeners();
+  }
+
+  void updateDescription(String value) {
+    _formData.description = value;
+    notifyListeners();
+  }
+
+  void addPhoto() {
+    // Lógica para añadir fotos
+  }
+
+  Future<void> saveService() async {
     setBusy(true);
     // Simular guardado
-    Future.delayed(const Duration(seconds: 2), () {
-      setBusy(false);
-      // Navegación o lógica de éxito
-    });
+    await Future.delayed(const Duration(seconds: 2));
+    setBusy(false);
+    // Lógica de éxito o navegación
   }
 }

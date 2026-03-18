@@ -6,6 +6,7 @@ import 'package:festum/core/network/api_client.dart';
 import 'package:festum/core/network/auth_interceptor.dart';
 import 'package:festum/core/network/session_interceptor.dart';
 import 'package:festum/core/services/auth_state_service.dart';
+import 'package:festum/core/services/provider_business_info_state_service.dart';
 import 'package:festum/core/services/registration_state_service.dart';
 import 'package:festum/features/auth/repositories/auth_repository.dart';
 import 'package:flutter/foundation.dart';
@@ -26,6 +27,10 @@ Future<void> setupLocator() async {
 
   locator.registerLazySingleton<AuthStateService>(
     () => AuthStateService(locator<SharedPreferences>()),
+  );
+
+  locator.registerLazySingleton<ProviderBusinessInfoStateService>(
+    () => ProviderBusinessInfoStateService(locator<SharedPreferences>()),
   );
 
   locator.registerLazySingleton<Dio>(
@@ -76,6 +81,7 @@ Future<void> setupLocator() async {
     () => AppRouter(
       locator<AuthStateService>(),
       locator<RegistrationStateService>(),
+      locator<ProviderBusinessInfoStateService>(),
     ),
   );
 }

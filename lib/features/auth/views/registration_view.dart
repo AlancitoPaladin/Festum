@@ -165,5 +165,6 @@ class RegistrationView extends StackedView<RegistrationViewModel> {
         locator(),
         locator(),
         locator(),
+        locator(),
       );
 }

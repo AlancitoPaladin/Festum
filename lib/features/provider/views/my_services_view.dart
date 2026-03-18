@@ -1,11 +1,16 @@
+import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/theme/app_colors.dart';
-import 'package:festum/features/provider/viewmodels/add_service_viewmodel.dart';
+import 'package:festum/core/widgets/custom_app_bar.dart';
+import 'package:festum/features/provider/models/provider_service.dart';
+import 'package:festum/features/provider/models/service_category.dart';
 import 'package:festum/features/provider/viewmodels/my_services_viewmodel.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:stacked/stacked.dart';
 
 class MyServicesView extends StatelessWidget {
-  const MyServicesView({super.key});
+  final bool showAppBar;
+  const MyServicesView({super.key, this.showAppBar = true});
 
   @override
   Widget build(BuildContext context) {
@@ -13,24 +18,7 @@ class MyServicesView extends StatelessWidget {
       viewModelBuilder: () => MyServicesViewModel(),
       builder: (context, model, child) => Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: const Icon(Icons.menu, color: AppColors.primaryText),
-          title: const Text(
-            'Mis servicios',
-            style: TextStyle(color: AppColors.primaryText, fontWeight: FontWeight.bold),
-          ),
-          actions: const [
-            Padding(
-              padding: EdgeInsets.only(right: 16.0),
-              child: CircleAvatar(
-                backgroundImage: NetworkImage('https://i.pravatar.cc/150?u=jair'),
-                radius: 18,
-              ),
-            ),
-          ],
-        ),
+        appBar: showAppBar ? const CustomAppBar(title: 'Mis servicios') : null,
         body: Column(
           children: [
             const Padding(
@@ -43,10 +31,17 @@ class MyServicesView extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: _AddServiceButton(onTap: () {
+                context.push(AppRoutes.providerCreateService);
+              }),
+            ),
+            const SizedBox(height: 24),
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                 itemCount: model.services.length,
                 itemBuilder: (context, index) {
                   final service = model.services[index];
@@ -54,15 +49,26 @@ class MyServicesView extends StatelessWidget {
                     service: service,
                     onToggle: () => model.toggleServiceStatus(index),
                     onDelete: () => model.deleteService(index),
+                    onManage: () {
+                      context.push(
+                        AppRoutes.providerManageServiceRoute(
+                          service.name,
+                          service.category.name,
+                        ),
+                      );
+                    },
+                    onEdit: () {
+                      context.push(
+                        AppRoutes.providerEditServiceRoute(
+                          service.id,
+                          service.name,
+                          service.category.name,
+                        ),
+                      );
+                    },
                   );
                 },
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: _AddServiceButton(onTap: () {
-                // Navegar a Crear Servicio
-              }),
             ),
           ],
         ),
@@ -84,27 +90,20 @@ class _AddServiceButton extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: AppColors.appBar, // Color verde oliva del proyecto
+          color: AppColors.backgroundElevated,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.appBar.withOpacity(0.2),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.add, color: Colors.white),
+            Icon(Icons.add, color: AppColors.secondaryText),
             SizedBox(width: 8),
             Text(
               'Añadir nuevo servicio',
               style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+                color: AppColors.secondaryText,
+                fontWeight: FontWeight.w500,
+                fontSize: 15,
               ),
             ),
           ],
@@ -118,11 +117,15 @@ class _ServiceCard extends StatelessWidget {
   final ProviderService service;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
+  final VoidCallback onManage;
+  final VoidCallback onEdit;
 
   const _ServiceCard({
     required this.service,
     required this.onToggle,
     required this.onDelete,
+    required this.onManage,
+    required this.onEdit,
   });
 
   @override
@@ -135,7 +138,7 @@ class _ServiceCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -185,7 +188,7 @@ class _ServiceCard extends StatelessWidget {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: onManage,
                   icon: const Icon(Icons.description_outlined, size: 18, color: Colors.white),
                   label: const Text('Gestionar servicio', style: TextStyle(color: Colors.white, fontSize: 12)),
                   style: ElevatedButton.styleFrom(
@@ -198,7 +201,7 @@ class _ServiceCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: onEdit,
                   icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primaryText),
                   label: const Text('Editar servicio', style: TextStyle(color: AppColors.primaryText, fontSize: 12)),
                   style: OutlinedButton.styleFrom(
@@ -233,7 +236,7 @@ class _ServiceCard extends StatelessWidget {
               Switch.adaptive(
                 value: service.isActive,
                 onChanged: (_) => onToggle(),
-                activeColor: AppColors.appBar,
+                activeTrackColor: AppColors.appBar,
               ),
             ],
           ),

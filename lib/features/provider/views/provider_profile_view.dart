@@ -1,9 +1,10 @@
+import 'package:festum/app/router/app_routes.dart';
+import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/custom_app_bar.dart';
-import 'package:festum/features/provider/models/provider_tab.dart';
 import 'package:festum/features/provider/viewmodels/provider_profile_viewmodel.dart';
-import 'package:festum/features/provider/widgets/provider_bottom_nav_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:stacked/stacked.dart';
 
 class ProviderProfileView extends StatelessWidget {
@@ -12,35 +13,20 @@ class ProviderProfileView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ViewModelBuilder<ProviderProfileViewModel>.reactive(
-      viewModelBuilder: () => ProviderProfileViewModel(),
+      viewModelBuilder: () => ProviderProfileViewModel(locator()),
       builder: (context, model, child) => Scaffold(
         backgroundColor: AppColors.background,
         appBar: const CustomAppBar(title: 'Mi Perfil'),
-        body: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                children: [
-                  _buildProfileHeader(model),
-                  const SizedBox(height: 32),
-                  _buildMenuSection(context, model),
-                  const SizedBox(height: 100), // Space for Nav Bar
-                ],
-              ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: ProviderBottomNavBar(
-                currentTab: ProviderTab.profile,
-                onTabPressed: (tab) {
-                  // Navigation handled by the shell in HomeView
-                },
-              ),
-            ),
-          ],
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: [
+              _buildProfileHeader(model),
+              const SizedBox(height: 32),
+              _buildMenuSection(context, model),
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
@@ -96,7 +82,7 @@ class ProviderProfileView extends StatelessWidget {
           _buildMenuItem(
             icon: Icons.business_outlined,
             title: 'Información del negocio',
-            onTap: model.editBusinessInfo,
+            onTap: () => context.push(AppRoutes.providerBusinessInfo),
           ),
           const Divider(height: 1, indent: 56, endIndent: 16),
           _buildMenuItem(
@@ -118,7 +104,7 @@ class ProviderProfileView extends StatelessWidget {
             title: 'Cerrar sesión',
             textColor: Colors.red,
             iconColor: Colors.red,
-            onTap: model.logout,
+            onTap: () => _logout(context, model),
           ),
         ],
       ),
@@ -147,5 +133,17 @@ class ProviderProfileView extends StatelessWidget {
       trailing: trailing ?? const Icon(Icons.chevron_right, size: 20, color: Colors.black26),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
     );
+  }
+
+  Future<void> _logout(
+    BuildContext context,
+    ProviderProfileViewModel model,
+  ) async {
+    await model.logout();
+    if (!context.mounted) {
+      return;
+    }
+
+    context.go(AppRoutes.login);
   }
 }

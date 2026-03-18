@@ -1,9 +1,16 @@
+import 'package:festum/core/services/provider_business_info_state_service.dart';
 import 'package:festum/features/provider/models/business_info.dart';
 import 'package:stacked/stacked.dart';
 
 class ProviderBusinessInfoViewModel extends BaseViewModel {
-  BusinessInfo _businessInfo = BusinessInfo();
+  ProviderBusinessInfoViewModel(this._providerBusinessInfoStateService);
+
+  final ProviderBusinessInfoStateService _providerBusinessInfoStateService;
+
+  final BusinessInfo _businessInfo = BusinessInfo();
   BusinessInfo get businessInfo => _businessInfo;
+  bool get isOnboardingRequired =>
+      _providerBusinessInfoStateService.requiresBusinessInfo;
 
   void updateName(String value) {
     _businessInfo.name = value;
@@ -49,6 +56,7 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
     setBusy(true);
     // Simular guardado en API/Firebase
     await Future.delayed(const Duration(seconds: 2));
+    await _providerBusinessInfoStateService.completeBusinessInfo();
     setBusy(false);
   }
 
