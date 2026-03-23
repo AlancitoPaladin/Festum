@@ -4,19 +4,19 @@ import 'package:festum/features/client/repositories/client_cart_repository.dart'
 class MockClientCartRepository implements ClientCartRepository {
   final List<ClientCartItem> _items = <ClientCartItem>[
     const ClientCartItem(
-      id: 'cart-1',
+      id: 'hall-aurora',
       name: 'Salón Aurora',
       quantity: 1,
       unitPriceCents: 4120000,
     ),
     const ClientCartItem(
-      id: 'cart-2',
+      id: 'furn-led',
       name: 'Pista y Periqueras LED',
       quantity: 1,
       unitPriceCents: 1460000,
     ),
     const ClientCartItem(
-      id: 'cart-3',
+      id: 'banq-sweet',
       name: 'Mesa Dulce y Postres',
       quantity: 1,
       unitPriceCents: 850000,
@@ -30,6 +30,33 @@ class MockClientCartRepository implements ClientCartRepository {
   }
 
   @override
+  Future<bool> containsService(String serviceId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    return _items.any((ClientCartItem item) => item.id == serviceId);
+  }
+
+  @override
+  Future<bool> addService({
+    required String serviceId,
+    required String name,
+    required int unitPriceCents,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 160));
+    if (_items.any((ClientCartItem item) => item.id == serviceId)) {
+      return false;
+    }
+    _items.add(
+      ClientCartItem(
+        id: serviceId,
+        name: name,
+        quantity: 1,
+        unitPriceCents: unitPriceCents,
+      ),
+    );
+    return true;
+  }
+
+  @override
   Future<ClientCartItem?> removeItem(String id) async {
     await Future<void>.delayed(const Duration(milliseconds: 140));
     final int index = _items.indexWhere((ClientCartItem item) => item.id == id);
@@ -40,34 +67,29 @@ class MockClientCartRepository implements ClientCartRepository {
   }
 
   @override
-  Future<ClientCartItem?> updateQuantity({
-    required String id,
-    required int quantity,
-  }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    final int index = _items.indexWhere((ClientCartItem item) => item.id == id);
-    if (index < 0) {
-      return null;
-    }
-    final ClientCartItem current = _items[index];
-    final int nextQuantity = quantity < 1 ? 1 : quantity;
-    final ClientCartItem updated = ClientCartItem(
-      id: current.id,
-      name: current.name,
-      quantity: nextQuantity,
-      unitPriceCents: current.unitPriceCents,
-    );
-    _items[index] = updated;
-    return updated;
-  }
-
-  @override
   Future<void> restoreItem({
     required ClientCartItem item,
     required int index,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 80));
+    if (_items.any((ClientCartItem current) => current.id == item.id)) {
+      return;
+    }
     final int safeIndex = index.clamp(0, _items.length);
-    _items.insert(safeIndex, item);
+    _items.insert(
+      safeIndex,
+      ClientCartItem(
+        id: item.id,
+        name: item.name,
+        quantity: 1,
+        unitPriceCents: item.unitPriceCents,
+      ),
+    );
+  }
+
+  @override
+  Future<void> clear() async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    _items.clear();
   }
 }

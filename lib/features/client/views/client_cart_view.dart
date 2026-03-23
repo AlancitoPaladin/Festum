@@ -1,15 +1,22 @@
+import 'dart:ui';
+
+import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/features/client/models/client_cart_item.dart';
 import 'package:festum/features/client/models/client_tab.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
+import 'package:festum/features/client/usecases/checkout_cart_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_cart_items_use_case.dart';
 import 'package:festum/features/client/usecases/remove_client_cart_item_use_case.dart';
 import 'package:festum/features/client/usecases/restore_client_cart_item_use_case.dart';
 import 'package:festum/features/client/widgets/client_feedback.dart';
 import 'package:festum/features/client/widgets/client_shell_scaffold.dart';
 import 'package:festum/features/client/widgets/client_status_view.dart';
+import 'package:festum/features/client/widgets/staggered_appear.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 class ClientCartView extends StatefulWidget {
   const ClientCartView({super.key});
@@ -20,12 +27,14 @@ class ClientCartView extends StatefulWidget {
 
 class _ClientCartViewState extends State<ClientCartView> {
   late final GetClientCartItemsUseCase _getClientCartItemsUseCase;
+  late final CheckoutCartUseCase _checkoutCartUseCase;
   late final RemoveClientCartItemUseCase _removeClientCartItemUseCase;
   late final RestoreClientCartItemUseCase _restoreClientCartItemUseCase;
   late final ClientTabUiStateService _tabUiStateService;
   late final ScrollController _scrollController;
 
   bool _isLoading = true;
+  bool _isCheckingOut = false;
   String? _errorMessage;
   List<ClientCartItem> _cartItems = <ClientCartItem>[];
 
@@ -33,6 +42,7 @@ class _ClientCartViewState extends State<ClientCartView> {
   void initState() {
     super.initState();
     _getClientCartItemsUseCase = locator<GetClientCartItemsUseCase>();
+    _checkoutCartUseCase = locator<CheckoutCartUseCase>();
     _removeClientCartItemUseCase = locator<RemoveClientCartItemUseCase>();
     _restoreClientCartItemUseCase = locator<RestoreClientCartItemUseCase>();
     _tabUiStateService = locator<ClientTabUiStateService>();
@@ -51,7 +61,10 @@ class _ClientCartViewState extends State<ClientCartView> {
   }
 
   void _onScroll() {
-    _tabUiStateService.saveScrollOffset(ClientTab.cart, _scrollController.offset);
+    _tabUiStateService.saveScrollOffset(
+      ClientTab.cart,
+      _scrollController.offset,
+    );
   }
 
   Future<void> _loadCart({required bool showLoader}) async {
@@ -103,6 +116,7 @@ class _ClientCartViewState extends State<ClientCartView> {
         context,
         message: 'No se pudo eliminar el elemento. Intenta nuevamente.',
       );
+      HapticFeedback.selectionClick();
       return;
     }
 
@@ -113,7 +127,7 @@ class _ClientCartViewState extends State<ClientCartView> {
 
     ClientFeedback.showMessage(
       context,
-      message: 'Se eliminó "${item.name}" del carrito',
+      message: 'Se elimino "${item.name}" del carrito',
       actionLabel: 'Deshacer',
       onAction: () async {
         await _restoreClientCartItemUseCase(item: removed, index: index);
@@ -127,6 +141,7 @@ class _ClientCartViewState extends State<ClientCartView> {
         _tabUiStateService.setCartCount(_cartItems.length);
       },
     );
+    HapticFeedback.lightImpact();
   }
 
   String _formatCurrency(int cents) {
@@ -196,21 +211,28 @@ class _ClientCartViewState extends State<ClientCartView> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      ClientFeedback.showMessage(
-                        this.context,
-                        message: 'Orden confirmada. Pasaremos a pago.',
-                      );
-                    },
-                    child: const Text('Confirmar y continuar'),
+                    onPressed: _isCheckingOut
+                        ? null
+                        : () async {
+                            Navigator.of(context).pop();
+                            await _confirmCheckout();
+                          },
+                    child: _isCheckingOut
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Confirmar y continuar'),
                   ),
                 ),
                 const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: _isCheckingOut
+                        ? null
+                        : () => Navigator.of(context).pop(),
                     child: const Text('Seguir editando'),
                   ),
                 ),
@@ -222,10 +244,56 @@ class _ClientCartViewState extends State<ClientCartView> {
     );
   }
 
+  Future<void> _confirmCheckout() async {
+    if (_isCheckingOut) {
+      return;
+    }
+
+    setState(() => _isCheckingOut = true);
+    final createdOrder = await _checkoutCartUseCase();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _isCheckingOut = false);
+
+    if (createdOrder == null) {
+      ClientFeedback.showMessage(
+        context,
+        message: 'El carrito esta vacio. Agrega servicios antes de continuar.',
+      );
+      HapticFeedback.selectionClick();
+      return;
+    }
+
+    await _loadCart(showLoader: false);
+    if (!mounted) {
+      return;
+    }
+    _tabUiStateService.setOrdersCount(
+      _tabUiStateService.badgeFor(ClientTab.orders) + 1,
+    );
+    ClientFeedback.showMessage(
+      context,
+      message: 'Orden #${createdOrder.id} creada correctamente.',
+    );
+    HapticFeedback.mediumImpact();
+    if (!mounted) {
+      return;
+    }
+    context.go(
+      AppRoutes.clientCheckoutSuccessRoute(
+        orderId: createdOrder.id,
+        title: createdOrder.title,
+        totalLabel: createdOrder.totalLabel,
+      ),
+    );
+  }
+
   _CartTotals _calculateTotals() {
     final int subtotal = _cartItems.fold<int>(
       0,
-      (int sum, ClientCartItem item) => sum + item.unitPriceCents * item.quantity,
+      (int sum, ClientCartItem item) =>
+          sum + item.unitPriceCents * item.quantity,
     );
     final int serviceFee = (subtotal * 0.05).round();
     final int tax = ((subtotal + serviceFee) * 0.16).round();
@@ -265,9 +333,11 @@ class _ClientCartViewState extends State<ClientCartView> {
 
     if (_cartItems.isEmpty) {
       return ClientStatusView.empty(
-        title: 'Tu carrito está vacio',
+        title: 'Tu carrito está vacío',
         message: 'Agrega servicios para continuar con tu orden.',
         icon: Icons.shopping_cart_outlined,
+        onPrimaryAction: () => context.go(AppRoutes.clientServices),
+        primaryActionLabel: 'Ver servicios',
         onRetry: () => _loadCart(showLoader: true),
         retryLabel: 'Actualizar',
       );
@@ -285,63 +355,90 @@ class _ClientCartViewState extends State<ClientCartView> {
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (BuildContext context, int index) {
         if (index == _cartItems.length) {
-          return Card(
-            color: AppColors.cardAccent,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Resumen de pago',
-                    style: Theme.of(context).textTheme.titleMedium,
+          return StaggeredAppear(
+            index: index,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.cardAccent.withValues(alpha: 0.84),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.outline.withValues(alpha: 0.28),
+                    ),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: AppColors.primaryText.withValues(alpha: 0.1),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  _SummaryRow(
-                    label: 'Subtotal',
-                    value: _formatCurrency(totals.subtotal),
-                  ),
-                  _SummaryRow(
-                    label: 'Cargo de servicio (5%)',
-                    value: _formatCurrency(totals.serviceFee),
-                  ),
-                  _SummaryRow(
-                    label: 'Impuestos (16%)',
-                    value: _formatCurrency(totals.tax),
-                  ),
-                  const Divider(height: 20),
-                  _SummaryRow(
-                    label: 'Total estimado',
-                    value: _formatCurrency(totals.total),
-                    emphasis: true,
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _showCheckoutSheet(totals),
-                      icon: const Icon(Icons.arrow_forward_rounded),
-                      label: const Text('Continuar con la orden'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'Resumen de pago',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 10),
+                        _SummaryRow(
+                          label: 'Subtotal',
+                          value: _formatCurrency(totals.subtotal),
+                        ),
+                        _SummaryRow(
+                          label: 'Cargo de servicio (5%)',
+                          value: _formatCurrency(totals.serviceFee),
+                        ),
+                        _SummaryRow(
+                          label: 'Impuestos (16%)',
+                          value: _formatCurrency(totals.tax),
+                        ),
+                        const Divider(height: 20),
+                        _SummaryRow(
+                          label: 'Total estimado',
+                          value: _formatCurrency(totals.total),
+                          emphasis: true,
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _showCheckoutSheet(totals),
+                            icon: const Icon(Icons.arrow_forward_rounded),
+                            label: const Text('Continuar con la orden'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           );
         }
 
         final ClientCartItem item = _cartItems[index];
-        return Card(
-          child: ListTile(
-            leading: const Icon(Icons.shopping_bag_rounded),
-            title: Text(item.name),
-            subtitle: Text('Cantidad: 1 • ${_formatCurrency(item.unitPriceCents)}'),
-            trailing: IconButton(
-              tooltip: 'Eliminar',
-              onPressed: () => _removeItem(index),
-              icon: const Icon(
-                Icons.delete_outline_rounded,
-                color: AppColors.alert,
+        return StaggeredAppear(
+          index: index,
+          child: Card(
+            child: ListTile(
+              leading: const Icon(Icons.shopping_bag_rounded),
+              title: Text(item.name),
+              subtitle: Text(
+                'Cantidad: 1 • ${_formatCurrency(item.unitPriceCents)}',
+              ),
+              trailing: IconButton(
+                tooltip: 'Eliminar',
+                onPressed: () => _removeItem(index),
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: AppColors.alert,
+                ),
               ),
             ),
           ),

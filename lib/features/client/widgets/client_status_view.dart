@@ -8,12 +8,16 @@ class ClientStatusView extends StatelessWidget {
     super.key,
   }) : icon = Icons.hourglass_top_rounded,
        onRetry = null,
-       retryLabel = null;
+       retryLabel = null,
+       onPrimaryAction = null,
+       primaryActionLabel = null;
 
   const ClientStatusView.empty({
     required this.title,
     required this.message,
     this.icon = Icons.inbox_rounded,
+    this.onPrimaryAction,
+    this.primaryActionLabel,
     this.onRetry,
     this.retryLabel,
     super.key,
@@ -23,6 +27,8 @@ class ClientStatusView extends StatelessWidget {
     this.title = 'No pudimos cargar esta sección',
     this.message = 'Revisa tu conexión e inténtalo de nuevo.',
     this.icon = Icons.wifi_off_rounded,
+    this.onPrimaryAction,
+    this.primaryActionLabel,
     this.onRetry,
     this.retryLabel = 'Reintentar',
     super.key,
@@ -31,6 +37,8 @@ class ClientStatusView extends StatelessWidget {
   final String title;
   final String message;
   final IconData icon;
+  final VoidCallback? onPrimaryAction;
+  final String? primaryActionLabel;
   final VoidCallback? onRetry;
   final String? retryLabel;
 
@@ -60,6 +68,14 @@ class ClientStatusView extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
+              if (onPrimaryAction != null) ...<Widget>[
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: onPrimaryAction,
+                  icon: const Icon(Icons.explore_rounded),
+                  label: Text(primaryActionLabel ?? 'Continuar'),
+                ),
+              ],
               if (onRetry != null) ...<Widget>[
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
