@@ -131,7 +131,7 @@ class CreateServiceView extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,7 +166,7 @@ class CreateServiceView extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,7 +205,7 @@ class _ImageSlot extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Center(
         child: isFirst
@@ -214,7 +214,7 @@ class _ImageSlot extends StatelessWidget {
                 width: 70,
                 height: 70,
                 decoration: BoxDecoration(
-                  color: AppColors.backgroundElevated.withOpacity(0.5),
+                  color: AppColors.backgroundElevated.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),

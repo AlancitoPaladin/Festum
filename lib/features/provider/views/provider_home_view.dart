@@ -1,6 +1,7 @@
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/network/api_url_resolver.dart';
 import 'package:festum/core/theme/app_colors.dart';
+import 'package:festum/core/widgets/app_remote_image.dart';
 import 'package:festum/features/provider/models/provider_home_response.dart';
 import 'package:festum/features/provider/models/provider_notification.dart';
 import 'package:festum/features/provider/models/provider_tab.dart';
@@ -147,8 +148,7 @@ class _HomeTabBody extends StatelessWidget {
                     Expanded(
                       child: StatCard(
                         title: 'Reservas',
-                        value:
-                            '${home?.quickStats.reservationsThisMonth ?? 0}',
+                        value: '${home?.quickStats.reservationsThisMonth ?? 0}',
                         subtitle: 'este mes',
                         icon: Icons.calendar_today,
                       ),
@@ -311,24 +311,32 @@ class _ProviderAvatar extends StatelessWidget {
     return CircleAvatar(
       radius: 20,
       backgroundColor: AppColors.backgroundElevated,
-      backgroundImage: resolvedImageUrl.isEmpty
-          ? null
-          : NetworkImage(resolvedImageUrl),
       child: resolvedImageUrl.isEmpty
-          ? const Icon(
-              Icons.person_outline,
-              color: AppColors.secondaryText,
-            )
-          : null,
+          ? const Icon(Icons.person_outline, color: AppColors.secondaryText)
+          : ClipOval(
+              child: AppRemoteImage(
+                imageUrl: resolvedImageUrl,
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+                placeholder: Container(
+                  width: 40,
+                  height: 40,
+                  color: AppColors.backgroundElevated,
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.person_outline,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ),
+            ),
     );
   }
 }
 
 class _HomeErrorState extends StatelessWidget {
-  const _HomeErrorState({
-    required this.message,
-    required this.onRetry,
-  });
+  const _HomeErrorState({required this.message, required this.onRetry});
 
   final String message;
   final Future<void> Function() onRetry;
@@ -382,10 +390,7 @@ class _EmptyFeaturedServicesState extends StatelessWidget {
       ),
       child: const Text(
         'Todavia no tienes servicios destacados para mostrar aqui.',
-        style: TextStyle(
-          color: AppColors.secondaryText,
-          height: 1.35,
-        ),
+        style: TextStyle(color: AppColors.secondaryText, height: 1.35),
       ),
     );
   }
@@ -445,10 +450,7 @@ class _NotificationsButton extends StatelessWidget {
   final int unreadCount;
   final VoidCallback onTap;
 
-  const _NotificationsButton({
-    required this.unreadCount,
-    required this.onTap,
-  });
+  const _NotificationsButton({required this.unreadCount, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -470,8 +472,10 @@ class _NotificationsButton extends StatelessWidget {
                 right: -2,
                 top: -2,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.alert,
                     borderRadius: BorderRadius.circular(999),
@@ -497,10 +501,7 @@ class _NotificationCard extends StatelessWidget {
   final ProviderNotification item;
   final VoidCallback onTap;
 
-  const _NotificationCard({
-    required this.item,
-    required this.onTap,
-  });
+  const _NotificationCard({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

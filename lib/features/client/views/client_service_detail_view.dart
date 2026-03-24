@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/theme/app_colors.dart';
+import 'package:festum/core/widgets/app_remote_image.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
 import 'package:festum/features/client/models/client_tab.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
@@ -41,6 +42,7 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
   bool _isInCart = false;
   String? _errorMessage;
   ClientServiceItem? _service;
+  bool _didRefreshAfterImage403 = false;
 
   @override
   void initState() {
@@ -76,6 +78,7 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
         _service = result;
         _errorMessage = null;
         _isLoading = false;
+        _didRefreshAfterImage403 = false;
       });
       final bool isInCart = await _isServiceInCartUseCase(result.id);
       if (!mounted) {
@@ -91,6 +94,14 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _refreshAfterImageForbidden() async {
+    if (_didRefreshAfterImage403) {
+      return;
+    }
+    _didRefreshAfterImage403 = true;
+    await _loadDetail(showLoader: false);
   }
 
   Future<void> _addCurrentServiceToCart() async {
@@ -182,7 +193,10 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
               ),
             ),
             const SizedBox(height: 8),
-            _HeroGallery(service: service),
+            _HeroGallery(
+              service: service,
+              onForbiddenImage: _refreshAfterImageForbidden,
+            ),
             const SizedBox(height: 16),
             _ServiceHeader(service: service),
             const SizedBox(height: 12),
@@ -244,57 +258,84 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
 }
 
 class _HeroGallery extends StatelessWidget {
-  const _HeroGallery({required this.service});
+  const _HeroGallery({required this.service, required this.onForbiddenImage});
 
   final ClientServiceItem service;
+  final Future<void> Function() onForbiddenImage;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: <Widget>[
-        Container(
-          height: 220,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: const LinearGradient(
-              colors: <Color>[AppColors.appBar, AppColors.secondaryButton],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: SizedBox(
+            height: 220,
+            child: Stack(
+              children: <Widget>[
+                Positioned.fill(
+                  child: AppRemoteImage(
+                    imageUrl: service.imageUrl,
+                    fit: BoxFit.cover,
+                    onForbidden: onForbiddenImage,
+                    placeholder: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: <Color>[
+                            AppColors.appBar,
+                            AppColors.secondaryButton,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.photo_library_rounded,
+                        color: AppColors.appBarText.withValues(alpha: 0.8),
+                        size: 56,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: <Color>[
+                          Colors.black.withValues(alpha: 0.08),
+                          Colors.black.withValues(alpha: 0.22),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 16,
+                  top: 16,
+                  child: Hero(
+                    tag: 'client-service-badge-${service.id}',
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: _Badge(label: service.badge),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 16,
+                  bottom: 16,
+                  child: Text(
+                    'Vista previa',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.appBarText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-          child: Stack(
-            children: <Widget>[
-              Positioned(
-                right: 16,
-                top: 16,
-                child: Hero(
-                  tag: 'client-service-badge-${service.id}',
-                  child: Material(
-                    type: MaterialType.transparency,
-                    child: _Badge(label: service.badge),
-                  ),
-                ),
-              ),
-              Align(
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.photo_library_rounded,
-                  color: AppColors.appBarText.withValues(alpha: 0.8),
-                  size: 56,
-                ),
-              ),
-              Positioned(
-                left: 16,
-                bottom: 16,
-                child: Text(
-                  'Vista previa',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.appBarText,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
         const SizedBox(height: 10),
@@ -305,18 +346,26 @@ class _HeroGallery extends StatelessWidget {
             itemCount: 5,
             separatorBuilder: (_, _) => const SizedBox(width: 10),
             itemBuilder: (BuildContext context, int index) {
-              return Container(
+              return SizedBox(
                 width: 86,
-                decoration: BoxDecoration(
+                child: AppRemoteImage(
+                  imageUrl: service.imageUrl,
+                  fit: BoxFit.cover,
                   borderRadius: BorderRadius.circular(16),
-                  color: AppColors.cardAccent,
-                  border: Border.all(
-                    color: AppColors.outline.withValues(alpha: 0.3),
+                  onForbidden: onForbiddenImage,
+                  placeholder: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      color: AppColors.cardAccent,
+                      border: Border.all(
+                        color: AppColors.outline.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.image_outlined,
+                      color: AppColors.secondaryText,
+                    ),
                   ),
-                ),
-                child: Icon(
-                  Icons.image_outlined,
-                  color: AppColors.secondaryText,
                 ),
               );
             },

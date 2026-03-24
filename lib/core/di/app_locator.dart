@@ -29,7 +29,11 @@ import 'package:festum/features/client/usecases/get_services_by_category_use_cas
 import 'package:festum/features/client/usecases/is_service_in_cart_use_case.dart';
 import 'package:festum/features/client/usecases/remove_client_cart_item_use_case.dart';
 import 'package:festum/features/client/usecases/restore_client_cart_item_use_case.dart';
-import 'package:festum/features/client/usecases/update_client_cart_quantity_use_case.dart';
+import 'package:festum/features/client/usecases/update_client_order_status_use_case.dart';
+import 'package:festum/features/provider/repositories/provider_business_repository.dart';
+import 'package:festum/features/provider/repositories/provider_home_repository.dart';
+import 'package:festum/features/provider/repositories/provider_reservations_repository.dart';
+import 'package:festum/features/provider/repositories/provider_services_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';

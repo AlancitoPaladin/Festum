@@ -22,10 +22,10 @@ class ProviderBottomNavBar extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.backgroundElevated,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.outline.withOpacity(0.35)),
+          border: Border.all(color: AppColors.outline.withValues(alpha: 0.35)),
           boxShadow: <BoxShadow>[
             BoxShadow(
-              color: AppColors.appBar.withOpacity(0.14),
+              color: AppColors.appBar.withValues(alpha: 0.14),
               blurRadius: 18,
               offset: const Offset(0, 6),
             ),
@@ -81,7 +81,7 @@ class _BottomTabButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             color: selected
-                ? AppColors.primaryButton.withOpacity(0.32)
+                ? AppColors.primaryButton.withValues(alpha: 0.32)
                 : Colors.transparent,
           ),
           child: Column(

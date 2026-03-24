@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:festum/core/services/provider_business_info_state_service.dart';
 import 'package:festum/features/provider/models/business_info.dart';
 import 'package:festum/features/provider/models/provider_asset_upload_response.dart';
@@ -33,6 +34,7 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
   bool _isUploadingAsset = false;
   bool _hasExistingProfile = false;
   bool _hasLoadedProfile = false;
+  bool _didRefreshAfterAsset403 = false;
 
   BusinessInfo get businessInfo => _businessInfo;
   bool get isOnboardingRequired =>
@@ -51,9 +53,10 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
     _errorMessage = null;
 
     try {
-      final ProviderBusinessProfile profile =
-          await _providerBusinessRepository.fetchProfile();
+      final ProviderBusinessProfile profile = await _providerBusinessRepository
+          .fetchProfile();
       _applyProfile(profile);
+      _didRefreshAfterAsset403 = false;
       _hasLoadedProfile = true;
 
       if (_hasMeaningfulBusinessData(profile)) {
@@ -61,7 +64,14 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
         await _providerBusinessInfoStateService.completeBusinessInfo();
       }
     } catch (error) {
-      _errorMessage = ProviderBusinessRepository.mapApiError(error);
+      if (error is DioException && error.response?.statusCode == 404) {
+        _hasLoadedProfile = true;
+        _hasExistingProfile = false;
+        _errorMessage = null;
+        await _providerBusinessInfoStateService.resetBusinessInfoProgress();
+      } else {
+        _errorMessage = ProviderBusinessRepository.mapApiError(error);
+      }
     } finally {
       setBusy(false);
       notifyListeners();
@@ -111,8 +121,8 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
   Future<String?> saveProfile() async {
     setBusy(true);
     try {
-      final ProviderBusinessProfile response =
-          await _providerBusinessRepository.saveProfile(_toProfile());
+      final ProviderBusinessProfile response = await _providerBusinessRepository
+          .saveProfile(_toProfile());
       _applyProfile(response);
       _hasExistingProfile = true;
       await _providerBusinessInfoStateService.completeBusinessInfo();
@@ -127,10 +137,8 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
 
   Future<String?> pickLogo() async {
     return _uploadAsset(
-      pickerAction: () => _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
-      ),
+      pickerAction: () =>
+          _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 85),
       uploadAction: _providerBusinessRepository.uploadLogo,
       onUploaded: (String assetUrl) {
         _businessInfo.logoUrl = assetUrl;
@@ -140,10 +148,8 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
 
   Future<String?> addPhoto() async {
     return _uploadAsset(
-      pickerAction: () => _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
-      ),
+      pickerAction: () =>
+          _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 85),
       uploadAction: _providerBusinessRepository.uploadPhoto,
       onUploaded: (String assetUrl) {
         _businessInfo.photoUrls = List<String>.from(_businessInfo.photoUrls)
@@ -153,6 +159,14 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
   }
 
   Future<void> retryLoad() async {
+    await initialize();
+  }
+
+  Future<void> refreshSignedAssetsOnce() async {
+    if (_didRefreshAfterAsset403 || isBusy) {
+      return;
+    }
+    _didRefreshAfterAsset403 = true;
     await initialize();
   }
 

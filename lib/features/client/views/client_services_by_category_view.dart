@@ -1,6 +1,7 @@
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/theme/app_colors.dart';
+import 'package:festum/core/widgets/app_remote_image.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
 import 'package:festum/features/client/models/client_tab.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
@@ -37,6 +38,7 @@ class _ClientServicesByCategoryViewState
   List<ClientServiceItem> _services = <ClientServiceItem>[];
   Set<String> _cartServiceIds = <String>{};
   Set<String> _addingServiceIds = <String>{};
+  bool _didRefreshAfterImage403 = false;
 
   @override
   void initState() {
@@ -63,6 +65,7 @@ class _ClientServicesByCategoryViewState
         _services = result;
         _errorMessage = null;
         _isLoading = false;
+        _didRefreshAfterImage403 = false;
       });
       if (!showLoader) {
         ClientFeedback.showMessage(context, message: 'Servicios actualizados');
@@ -77,6 +80,14 @@ class _ClientServicesByCategoryViewState
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _refreshAfterImageForbidden() async {
+    if (_didRefreshAfterImage403) {
+      return;
+    }
+    _didRefreshAfterImage403 = true;
+    await _loadServices(showLoader: false);
   }
 
   Future<void> _syncCartState() async {
@@ -194,10 +205,27 @@ class _ClientServicesByCategoryViewState
                 vertical: 8,
               ),
               leading: CircleAvatar(
-                backgroundColor: AppColors.secondaryButton.withValues(
-                  alpha: 0.35,
+                radius: 22,
+                backgroundColor: AppColors.backgroundElevated,
+                child: ClipOval(
+                  child: AppRemoteImage(
+                    imageUrl: item.imageUrl,
+                    fit: BoxFit.cover,
+                    width: 44,
+                    height: 44,
+                    onForbidden: _refreshAfterImageForbidden,
+                    placeholder: Container(
+                      width: 44,
+                      height: 44,
+                      color: AppColors.secondaryButton.withValues(alpha: 0.35),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        widget.category.icon,
+                        color: AppColors.activeIcon,
+                      ),
+                    ),
+                  ),
                 ),
-                child: Icon(widget.category.icon, color: AppColors.activeIcon),
               ),
               title: Hero(
                 tag: 'client-service-title-${item.id}',

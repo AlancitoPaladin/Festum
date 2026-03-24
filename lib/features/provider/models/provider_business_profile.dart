@@ -1,3 +1,6 @@
+import 'package:festum/core/network/asset_url_safety.dart';
+import 'package:festum/features/provider/models/provider_signed_asset.dart';
+
 class ProviderBusinessProfile {
   const ProviderBusinessProfile({
     required this.providerId,
@@ -11,6 +14,8 @@ class ProviderBusinessProfile {
     required this.website,
     required this.logoUrl,
     required this.photoUrls,
+    this.logo,
+    this.photos = const <ProviderSignedAsset>[],
   });
 
   final String providerId;
@@ -24,24 +29,143 @@ class ProviderBusinessProfile {
   final String website;
   final String logoUrl;
   final List<String> photoUrls;
+  final ProviderSignedAsset? logo;
+  final List<ProviderSignedAsset> photos;
 
   factory ProviderBusinessProfile.fromJson(Map<String, dynamic> json) {
-    return ProviderBusinessProfile(
-      providerId: (json['provider_id'] ?? '').toString(),
-      businessName: (json['business_name'] ?? '').toString(),
-      location: (json['location'] ?? '').toString(),
-      coverageArea: (json['coverage_area'] ?? '').toString(),
-      contactNumber: (json['contact_number'] ?? '').toString(),
-      whatsapp: (json['whatsapp'] ?? '').toString(),
-      instagram: (json['instagram'] ?? '').toString(),
-      facebook: (json['facebook'] ?? '').toString(),
-      website: (json['website'] ?? '').toString(),
-      logoUrl: (json['logo_url'] ?? '').toString(),
-      photoUrls:
-          ((json['photo_urls'] as List<dynamic>? ?? <dynamic>[])
-              .map((dynamic item) => item.toString())
-              .toList()),
+    final Map<String, dynamic> source = _resolveSource(json);
+    final ProviderSignedAsset? logo = _parseLogo(source);
+    final List<ProviderSignedAsset> photos = _parsePhotos(source);
+    final String fallbackLogoUrl = sanitizeAssetUrl(
+      (source['logo_url'] ?? source['logoUrl'] ?? source['logo'] ?? '')
+          .toString(),
     );
+    final List<String> fallbackPhotoUrls = _parseLegacyPhotoUrls(source);
+
+    return ProviderBusinessProfile(
+      providerId: (source['provider_id'] ?? source['providerId'] ?? '')
+          .toString(),
+      businessName: (source['business_name'] ?? source['businessName'] ?? '')
+          .toString(),
+      location: (source['location'] ?? '').toString(),
+      coverageArea: (source['coverage_area'] ?? source['coverageArea'] ?? '')
+          .toString(),
+      contactNumber: (source['contact_number'] ?? source['contactNumber'] ?? '')
+          .toString(),
+      whatsapp: (source['whatsapp'] ?? '').toString(),
+      instagram: (source['instagram'] ?? '').toString(),
+      facebook: (source['facebook'] ?? '').toString(),
+      website: (source['website'] ?? '').toString(),
+      logoUrl: logo?.url.isNotEmpty == true ? logo!.url : fallbackLogoUrl,
+      photoUrls: photos.isNotEmpty
+          ? photos
+                .where((ProviderSignedAsset item) => item.url.isNotEmpty)
+                .map((ProviderSignedAsset item) => item.url)
+                .toList()
+          : fallbackPhotoUrls,
+      logo: logo,
+      photos: photos,
+    );
+  }
+
+  static ProviderSignedAsset? _parseLogo(Map<String, dynamic> source) {
+    final dynamic logo = source['logo'];
+    if (logo is Map<String, dynamic>) {
+      final ProviderSignedAsset parsed = ProviderSignedAsset.fromJson(logo);
+      if (parsed.hasUrl || parsed.key.isNotEmpty) {
+        return parsed;
+      }
+    } else if (logo is Map) {
+      final ProviderSignedAsset parsed = ProviderSignedAsset.fromJson(
+        Map<String, dynamic>.from(logo),
+      );
+      if (parsed.hasUrl || parsed.key.isNotEmpty) {
+        return parsed;
+      }
+    }
+
+    final Map<String, dynamic> fallback = <String, dynamic>{
+      'key': (source['logo_key'] ?? source['logoKey'] ?? '').toString(),
+      'url': (source['logo_url'] ?? source['logoUrl'] ?? '').toString(),
+      'expires_at': source['logo_expires_at'] ?? source['logoExpiresAt'],
+    };
+    final ProviderSignedAsset parsed = ProviderSignedAsset.fromJson(fallback);
+    if (parsed.hasUrl || parsed.key.isNotEmpty) {
+      return parsed;
+    }
+
+    return null;
+  }
+
+  static List<String> _parseLegacyPhotoUrls(Map<String, dynamic> source) {
+    final dynamic photoUrls =
+        source['photo_urls'] ?? source['photoUrls'] ?? source['photos'];
+    if (photoUrls is List) {
+      return photoUrls
+          .whereType<String>()
+          .map(sanitizeAssetUrl)
+          .where((String item) => item.isNotEmpty)
+          .toList();
+    }
+    return <String>[];
+  }
+
+  static List<ProviderSignedAsset> _parsePhotos(Map<String, dynamic> source) {
+    final dynamic rawPhotos = source['photos'];
+    if (rawPhotos is List) {
+      return rawPhotos
+          .map((dynamic item) {
+            if (item is Map<String, dynamic>) {
+              return ProviderSignedAsset.fromJson(item);
+            }
+            if (item is Map) {
+              return ProviderSignedAsset.fromJson(
+                Map<String, dynamic>.from(item),
+              );
+            }
+            if (item is String && item.trim().isNotEmpty) {
+              final String safeUrl = sanitizeAssetUrl(item);
+              if (safeUrl.isEmpty) {
+                return null;
+              }
+              return ProviderSignedAsset.fromJson(<String, dynamic>{
+                'url': safeUrl,
+              });
+            }
+            return null;
+          })
+          .whereType<ProviderSignedAsset>()
+          .where(
+            (ProviderSignedAsset asset) => asset.hasUrl || asset.key.isNotEmpty,
+          )
+          .toList();
+    }
+
+    final dynamic rawLegacyUrls = source['photo_urls'] ?? source['photoUrls'];
+    if (rawLegacyUrls is List) {
+      return rawLegacyUrls
+          .whereType<String>()
+          .map(sanitizeAssetUrl)
+          .where((String item) => item.trim().isNotEmpty)
+          .map(
+            (String item) =>
+                ProviderSignedAsset.fromJson(<String, dynamic>{'url': item}),
+          )
+          .toList();
+    }
+
+    return const <ProviderSignedAsset>[];
+  }
+
+  static Map<String, dynamic> _resolveSource(Map<String, dynamic> json) {
+    final dynamic data = json['data'];
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    return json;
   }
 
   Map<String, dynamic> toJson() {
@@ -56,6 +180,11 @@ class ProviderBusinessProfile {
       'website': website,
       'logo_url': logoUrl,
       'photo_urls': photoUrls,
+      if (logo != null) 'logo': logo!.toJson(),
+      if (photos.isNotEmpty)
+        'photos': photos
+            .map((ProviderSignedAsset item) => item.toJson())
+            .toList(),
     };
   }
 
@@ -71,6 +200,8 @@ class ProviderBusinessProfile {
     String? website,
     String? logoUrl,
     List<String>? photoUrls,
+    ProviderSignedAsset? logo,
+    List<ProviderSignedAsset>? photos,
   }) {
     return ProviderBusinessProfile(
       providerId: providerId ?? this.providerId,
@@ -84,6 +215,8 @@ class ProviderBusinessProfile {
       website: website ?? this.website,
       logoUrl: logoUrl ?? this.logoUrl,
       photoUrls: photoUrls ?? this.photoUrls,
+      logo: logo ?? this.logo,
+      photos: photos ?? this.photos,
     );
   }
 }

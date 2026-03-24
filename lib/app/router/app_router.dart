@@ -43,7 +43,7 @@ class AppRouter {
   final ProviderBusinessInfoStateService _providerBusinessInfoStateService;
 
   late final GoRouter router = GoRouter(
-    initialLocation: AppRoutes.login,
+    initialLocation: AppRoutes.registrationType,
     refreshListenable: Listenable.merge(<Listenable>[
       _authStateService,
       _registrationStateService,
@@ -258,6 +258,8 @@ class AppRouter {
   );
 
   String? _redirect(BuildContext context, GoRouterState state) {
+    final bool hasCompletedRegistration =
+        _registrationStateService.hasCompletedRegistration;
     final bool isAuthenticated = _authStateService.isAuthenticated;
     final AccountRole? role = _authStateService.role;
     final String location = state.matchedLocation;
@@ -267,7 +269,23 @@ class AppRouter {
         location.startsWith('/registro/');
     final bool isProviderRoute = location.startsWith('/provider/');
     final bool isClientRoute = location.startsWith('/client/');
+
+    if (isAuthenticated && role == null) {
+      return AppRoutes.login;
+    }
+
     if (!isAuthenticated) {
+      final bool isOnboardingRoute =
+          location == AppRoutes.registrationType || location.startsWith('/registro/');
+
+      if (!hasCompletedRegistration && !isOnboardingRoute && location != AppRoutes.login) {
+        return AppRoutes.registrationType;
+      }
+
+      if (hasCompletedRegistration && isOnboardingRoute) {
+        return AppRoutes.login;
+      }
+
       if (isAuthRoute) {
         return null;
       }

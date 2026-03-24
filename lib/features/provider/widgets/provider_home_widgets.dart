@@ -1,5 +1,6 @@
 import 'package:festum/core/network/api_url_resolver.dart';
 import 'package:festum/core/theme/app_colors.dart';
+import 'package:festum/core/widgets/app_remote_image.dart';
 import 'package:flutter/material.dart';
 
 class StatCard extends StatelessWidget {
@@ -107,13 +108,12 @@ class ServiceItemCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: resolvedImageUrl.isEmpty
                 ? _buildImageFallback()
-                : Image.network(
-                    resolvedImageUrl,
+                : AppRemoteImage(
+                    imageUrl: resolvedImageUrl,
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        _buildImageFallback(),
+                    placeholder: _buildImageFallback(),
                   ),
           ),
           const SizedBox(width: 12),

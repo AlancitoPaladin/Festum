@@ -32,7 +32,9 @@ class DynamicSelectionList extends StatelessWidget {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.appBar.withOpacity(0.08) : Colors.transparent,
+                  color: isSelected
+                      ? AppColors.appBar.withValues(alpha: 0.08)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: isSelected ? AppColors.appBar : Colors.black12,

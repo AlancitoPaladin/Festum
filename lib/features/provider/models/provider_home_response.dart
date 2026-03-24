@@ -1,3 +1,5 @@
+import 'package:festum/core/network/asset_url_safety.dart';
+
 class ProviderHomeResponse {
   const ProviderHomeResponse({
     required this.providerId,
@@ -16,11 +18,16 @@ class ProviderHomeResponse {
   final List<ProviderFeaturedService> featuredServices;
 
   factory ProviderHomeResponse.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic>? avatarPayload = _asMap(json['avatar']);
+    final String rawAvatarUrl =
+        (avatarPayload?['url'] ?? json['avatar_url'] ?? json['avatarUrl'] ?? '')
+            .toString();
+
     return ProviderHomeResponse(
       providerId: (json['provider_id'] ?? '').toString(),
       displayName: (json['display_name'] ?? '').toString(),
       businessName: (json['business_name'] ?? '').toString(),
-      avatarUrl: (json['avatar_url'] ?? '').toString(),
+      avatarUrl: sanitizeAssetUrl(rawAvatarUrl),
       quickStats: ProviderQuickStats.fromJson(
         Map<String, dynamic>.from(
           (json['quick_stats'] as Map<dynamic, dynamic>? ??
@@ -38,6 +45,16 @@ class ProviderHomeResponse {
               )
               .toList()),
     );
+  }
+
+  static Map<String, dynamic>? _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return null;
   }
 }
 
@@ -78,6 +95,15 @@ class ProviderFeaturedService {
   final String imageUrl;
 
   factory ProviderFeaturedService.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic>? imagePayload = _asMap(json['image']);
+    final String rawImageUrl =
+        (imagePayload?['url'] ??
+                json['image_url'] ??
+                json['imageUrl'] ??
+                json['asset_url'] ??
+                '')
+            .toString();
+
     return ProviderFeaturedService(
       id: (json['id'] ?? '').toString(),
       title: (json['title'] ?? '').toString(),
@@ -85,8 +111,18 @@ class ProviderFeaturedService {
       status: (json['status'] ?? '').toString(),
       priceLabel: (json['price_label'] ?? '').toString(),
       reservations: _toInt(json['reservations']),
-      imageUrl: (json['image_url'] ?? '').toString(),
+      imageUrl: sanitizeAssetUrl(rawImageUrl),
     );
+  }
+
+  static Map<String, dynamic>? _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return null;
   }
 }
 

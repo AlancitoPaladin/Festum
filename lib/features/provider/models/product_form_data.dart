@@ -1,5 +1,3 @@
-import 'package:festum/features/provider/models/service_category.dart';
-
 class ProductFormData {
   String name;
   double price;

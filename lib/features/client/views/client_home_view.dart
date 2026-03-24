@@ -2,6 +2,7 @@ import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/services/auth_state_service.dart';
 import 'package:festum/core/theme/app_colors.dart';
+import 'package:festum/core/widgets/app_remote_image.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
 import 'package:festum/features/client/models/client_tab.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
@@ -38,6 +39,7 @@ class _ClientHomeViewState extends State<ClientHomeView> {
       <ClientServiceCategory, List<ClientServiceItem>>{};
   Set<String> _cartServiceIds = <String>{};
   Set<String> _addingServiceIds = <String>{};
+  bool _didRefreshAfterImage403 = false;
 
   @override
   void initState() {
@@ -84,6 +86,7 @@ class _ClientHomeViewState extends State<ClientHomeView> {
         _sections = result;
         _errorMessage = null;
         _isLoading = false;
+        _didRefreshAfterImage403 = false;
       });
       if (!showLoader) {
         ClientFeedback.showMessage(context, message: 'Inicio actualizado');
@@ -98,6 +101,14 @@ class _ClientHomeViewState extends State<ClientHomeView> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _refreshAfterImageForbidden() async {
+    if (_didRefreshAfterImage403) {
+      return;
+    }
+    _didRefreshAfterImage403 = true;
+    await _loadHomeSections(showLoader: false);
   }
 
   Future<void> _syncCartState() async {
@@ -214,6 +225,7 @@ class _ClientHomeViewState extends State<ClientHomeView> {
                 addingServiceIds: _addingServiceIds,
                 onAddService: _addService,
                 onOpenCart: _goToCart,
+                onForbiddenImage: _refreshAfterImageForbidden,
               ),
             ),
           )
@@ -230,6 +242,7 @@ class _ServiceCategorySection extends StatelessWidget {
     required this.addingServiceIds,
     required this.onAddService,
     required this.onOpenCart,
+    required this.onForbiddenImage,
   });
 
   final ClientServiceCategory category;
@@ -238,6 +251,7 @@ class _ServiceCategorySection extends StatelessWidget {
   final Set<String> addingServiceIds;
   final ValueChanged<ClientServiceItem> onAddService;
   final VoidCallback onOpenCart;
+  final Future<void> Function() onForbiddenImage;
 
   @override
   Widget build(BuildContext context) {
@@ -283,6 +297,7 @@ class _ServiceCategorySection extends StatelessWidget {
                       isAdding: addingServiceIds.contains(item.id),
                       onAdd: () => onAddService(item),
                       onOpenCart: onOpenCart,
+                      onForbiddenImage: onForbiddenImage,
                       onTap: () {
                         context.go(
                           AppRoutes.clientServiceDetails(
@@ -310,6 +325,7 @@ class _ServicePreviewCard extends StatelessWidget {
     required this.isAdding,
     required this.onAdd,
     required this.onOpenCart,
+    required this.onForbiddenImage,
     required this.onTap,
   });
 
@@ -318,6 +334,7 @@ class _ServicePreviewCard extends StatelessWidget {
   final bool isAdding;
   final VoidCallback onAdd;
   final VoidCallback onOpenCart;
+  final Future<void> Function() onForbiddenImage;
   final VoidCallback onTap;
 
   @override
@@ -335,6 +352,25 @@ class _ServicePreviewCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
+                SizedBox(
+                  height: 64,
+                  width: double.infinity,
+                  child: AppRemoteImage(
+                    imageUrl: item.imageUrl,
+                    fit: BoxFit.cover,
+                    borderRadius: BorderRadius.circular(12),
+                    onForbidden: onForbiddenImage,
+                    placeholder: Container(
+                      color: AppColors.backgroundElevated,
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.image_outlined,
+                        color: AppColors.secondaryText.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Hero(
                   tag: 'client-service-badge-${item.id}',
                   child: Material(

@@ -45,6 +45,9 @@ class ClientServiceItem {
     required this.priceLabel,
     required this.unitPriceCents,
     required this.badge,
+    this.imageKey = '',
+    this.imageUrl = '',
+    this.imageExpiresAt,
     this.displayNameShort,
     this.displaySubtitleShort,
   });
@@ -55,6 +58,9 @@ class ClientServiceItem {
   final String priceLabel;
   final int unitPriceCents;
   final String badge;
+  final String imageKey;
+  final String imageUrl;
+  final DateTime? imageExpiresAt;
   final String? displayNameShort;
   final String? displaySubtitleShort;
 

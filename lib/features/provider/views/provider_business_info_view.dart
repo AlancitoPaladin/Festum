@@ -1,6 +1,7 @@
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/network/api_url_resolver.dart';
+import 'package:festum/core/services/auth_state_service.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/custom_app_bar.dart';
 import 'package:festum/features/provider/utils/provider_field_input.dart';
@@ -10,17 +11,29 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:stacked/stacked.dart';
 
+Map<String, String>? _authorizedImageHeaders() {
+  final String? token = locator<AuthStateService>().accessToken;
+  if (token == null || token.trim().isEmpty) {
+    return null;
+  }
+  return <String, String>{'Authorization': 'Bearer $token'};
+}
+
+bool _isHttp403ImageError(Object error) {
+  final String message = error.toString().toLowerCase();
+  return message.contains('statuscode: 403') ||
+      message.contains('status code: 403') ||
+      message.contains('403');
+}
+
 class ProviderBusinessInfoView extends StatelessWidget {
   const ProviderBusinessInfoView({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ViewModelBuilder<ProviderBusinessInfoViewModel>.reactive(
-      viewModelBuilder: () => ProviderBusinessInfoViewModel(
-        locator(),
-        locator(),
-        locator(),
-      ),
+      viewModelBuilder: () =>
+          ProviderBusinessInfoViewModel(locator(), locator(), locator()),
       onViewModelReady: (ProviderBusinessInfoViewModel model) {
         model.initialize();
       },
@@ -37,10 +50,7 @@ class ProviderBusinessInfoView extends StatelessWidget {
     );
   }
 
-  Widget _buildBody(
-    BuildContext context,
-    ProviderBusinessInfoViewModel model,
-  ) {
+  Widget _buildBody(BuildContext context, ProviderBusinessInfoViewModel model) {
     if (model.isBusy && !model.hasLoadedProfile) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -73,10 +83,8 @@ class ProviderBusinessInfoView extends StatelessWidget {
           _LogoUploadCard(
             imageUrl: model.businessInfo.logoUrl,
             isUploading: model.isUploadingAsset,
-            onTap: () => _runAsyncMessage(
-              context,
-              model.pickLogo,
-            ),
+            onForbiddenImage: model.refreshSignedAssetsOnce,
+            onTap: () => _runAsyncMessage(context, model.pickLogo),
           ),
           const SizedBox(height: 32),
           const _SectionLabel(label: 'Informacion basica'),
@@ -177,22 +185,19 @@ class ProviderBusinessInfoView extends StatelessWidget {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: model.businessInfo.photoUrls.length + 1,
-              separatorBuilder: (context, index) =>
-                  const SizedBox(width: 12),
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
                 if (index == 0) {
                   return _ImageUploadSlot(
                     isAddButton: true,
                     isUploading: model.isUploadingAsset,
-                    onTap: () => _runAsyncMessage(
-                      context,
-                      model.addPhoto,
-                    ),
+                    onTap: () => _runAsyncMessage(context, model.addPhoto),
                   );
                 }
 
                 return _ImageUploadSlot(
                   imageUrl: model.businessInfo.photoUrls[index - 1],
+                  onForbiddenImage: model.refreshSignedAssetsOnce,
                 );
               },
             ),
@@ -280,10 +285,7 @@ class ProviderBusinessInfoView extends StatelessWidget {
 }
 
 class _BusinessInfoErrorState extends StatelessWidget {
-  const _BusinessInfoErrorState({
-    required this.message,
-    required this.onRetry,
-  });
+  const _BusinessInfoErrorState({required this.message, required this.onRetry});
 
   final String message;
   final Future<void> Function() onRetry;
@@ -344,16 +346,19 @@ class _LogoUploadCard extends StatelessWidget {
   const _LogoUploadCard({
     required this.imageUrl,
     required this.isUploading,
+    required this.onForbiddenImage,
     required this.onTap,
   });
 
   final String? imageUrl;
   final bool isUploading;
+  final Future<void> Function() onForbiddenImage;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final String resolvedImageUrl = resolveApiAssetUrl(imageUrl ?? '');
+    final Map<String, String>? headers = _authorizedImageHeaders();
 
     return InkWell(
       onTap: isUploading ? null : onTap,
@@ -367,25 +372,63 @@ class _LogoUploadCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.backgroundElevated,
-                borderRadius: BorderRadius.circular(12),
-                image: resolvedImageUrl.isEmpty
-                    ? null
-                    : DecorationImage(
-                        image: NetworkImage(resolvedImageUrl),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundElevated,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: resolvedImageUrl.isEmpty
+                    ? const Icon(
+                        Icons.add_a_photo_outlined,
+                        color: AppColors.secondaryText,
+                      )
+                    : Image.network(
+                        resolvedImageUrl,
                         fit: BoxFit.cover,
+                        headers: headers,
+                        loadingBuilder:
+                            (
+                              BuildContext context,
+                              Widget child,
+                              ImageChunkEvent? loadingProgress,
+                            ) {
+                              if (loadingProgress == null) {
+                                return child;
+                              }
+                              return const Center(
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              );
+                            },
+                        errorBuilder:
+                            (
+                              BuildContext context,
+                              Object error,
+                              StackTrace? stackTrace,
+                            ) {
+                              if (_isHttp403ImageError(error)) {
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  onForbiddenImage();
+                                });
+                              }
+                              return const Icon(
+                                Icons.broken_image_outlined,
+                                color: AppColors.secondaryText,
+                              );
+                            },
                       ),
               ),
-              child: resolvedImageUrl.isEmpty
-                  ? const Icon(
-                      Icons.add_a_photo_outlined,
-                      color: AppColors.secondaryText,
-                    )
-                  : null,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -511,10 +554,7 @@ class _SocialField extends StatelessWidget {
               style: const TextStyle(fontSize: 12),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: const TextStyle(
-                  color: Colors.black26,
-                  fontSize: 12,
-                ),
+                hintStyle: const TextStyle(color: Colors.black26, fontSize: 12),
                 border: InputBorder.none,
                 isDense: true,
               ),
@@ -531,17 +571,20 @@ class _ImageUploadSlot extends StatelessWidget {
     this.imageUrl,
     this.isAddButton = false,
     this.isUploading = false,
+    this.onForbiddenImage,
     this.onTap,
   });
 
   final String? imageUrl;
   final bool isAddButton;
   final bool isUploading;
+  final Future<void> Function()? onForbiddenImage;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final String resolvedImageUrl = resolveApiAssetUrl(imageUrl ?? '');
+    final Map<String, String>? headers = _authorizedImageHeaders();
 
     return InkWell(
       onTap: isUploading ? null : onTap,
@@ -552,43 +595,84 @@ class _ImageUploadSlot extends StatelessWidget {
           color: AppColors.card,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
-          image: !isAddButton && resolvedImageUrl.isNotEmpty
-              ? DecorationImage(
-                  image: NetworkImage(resolvedImageUrl),
-                  fit: BoxFit.cover,
-                )
-              : null,
         ),
-        child: Center(
-          child: isAddButton
-              ? isUploading
-                    ? const SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(
-                        Icons.add,
-                        size: 32,
-                        color: Color.fromRGBO(125, 139, 114, 1),
-                      )
-              : resolvedImageUrl.isEmpty
-              ? Container(
-                  width: 80,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: AppColors.backgroundElevated.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Center(
+            child: isAddButton
+                ? isUploading
+                      ? const SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(
+                          Icons.add,
+                          size: 32,
+                          color: Color.fromRGBO(125, 139, 114, 1),
+                        )
+                : resolvedImageUrl.isEmpty
+                ? Container(
+                    width: 80,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundElevated.withValues(
+                        alpha: 0.5,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  )
+                : Image.network(
+                    resolvedImageUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    headers: headers,
+                    loadingBuilder:
+                        (
+                          BuildContext context,
+                          Widget child,
+                          ImageChunkEvent? loadingProgress,
+                        ) {
+                          if (loadingProgress == null) {
+                            return child;
+                          }
+                          return const Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        },
+                    errorBuilder:
+                        (
+                          BuildContext context,
+                          Object error,
+                          StackTrace? stackTrace,
+                        ) {
+                          if (_isHttp403ImageError(error)) {
+                            final Future<void> Function()? callback =
+                                onForbiddenImage;
+                            if (callback != null) {
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                callback();
+                              });
+                            }
+                          }
+                          return Container(
+                            color: AppColors.backgroundElevated.withValues(
+                              alpha: 0.5,
+                            ),
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.broken_image_outlined,
+                              color: AppColors.secondaryText,
+                            ),
+                          );
+                        },
                   ),
-                )
-              : Container(
-                  width: double.infinity,
-                  height: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
+          ),
         ),
       ),
     );
