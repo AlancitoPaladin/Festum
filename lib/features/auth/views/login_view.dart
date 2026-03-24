@@ -108,5 +108,7 @@ class LoginView extends StackedView<LoginViewModel> {
   LoginViewModel viewModelBuilder(BuildContext context) => LoginViewModel(
     locator(),
     locator(),
+    locator(),
+    locator(),
   );
 }

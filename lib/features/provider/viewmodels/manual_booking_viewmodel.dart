@@ -4,9 +4,15 @@ import 'package:flutter/material.dart';
 class ManualBookingViewModel extends BaseViewModel {
   String customerName = '';
   DateTime? selectedDate;
-  TimeOfDay? selectedTime;
+  bool hasSpecificSchedule = false;
+  TimeOfDay? startTime;
+  TimeOfDay? endTime;
   String eventType = '';
   int guests = 0;
+  String contactPhone = '';
+  String contactEmail = '';
+  String eventLocation = '';
+  String paymentDetails = '';
   String notes = '';
 
   void setDate(DateTime date) {
@@ -14,8 +20,23 @@ class ManualBookingViewModel extends BaseViewModel {
     notifyListeners();
   }
 
-  void setTime(TimeOfDay time) {
-    selectedTime = time;
+  void toggleSpecificSchedule(bool value) {
+    hasSpecificSchedule = value;
+
+    if (!value) {
+      startTime = null;
+      endTime = null;
+    }
+    notifyListeners();
+  }
+
+  void setStartTime(TimeOfDay time) {
+    startTime = time;
+    notifyListeners();
+  }
+
+  void setEndTime(TimeOfDay time) {
+    endTime = time;
     notifyListeners();
   }
 

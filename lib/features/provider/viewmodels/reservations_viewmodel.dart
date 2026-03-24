@@ -1,79 +1,63 @@
 import 'package:festum/app/router/app_routes.dart';
+import 'package:festum/features/provider/models/product_reservations_response.dart';
 import 'package:festum/features/provider/models/service_category.dart';
-import 'package:go_router/go_router.dart';
+import 'package:festum/features/provider/repositories/provider_reservations_repository.dart';
 import 'package:flutter/widgets.dart';
+import 'package:go_router/go_router.dart';
 import 'package:stacked/stacked.dart';
 
-class Booking {
-  final String customerName;
-  final String customerImageUrl;
-  final DateTime date;
-  final String status;
-
-  Booking({
-    required this.customerName,
-    required this.customerImageUrl,
-    required this.date,
-    required this.status,
-  });
-}
-
-class ProductReservationSummary {
-  final String id;
-  final String productName;
-  final ServiceCategory category;
-  final String description;
-  final String imageUrl;
-  final Booking? nextBooking;
-
-  ProductReservationSummary({
-    required this.id,
-    required this.productName,
-    required this.category,
-    required this.description,
-    this.imageUrl = '',
-    this.nextBooking,
-  });
-}
-
 class ReservationsViewModel extends BaseViewModel {
-  final List<ProductReservationSummary> _products = [
-    ProductReservationSummary(
-      id: '1',
-      productName: 'Salón Imperial',
-      category: ServiceCategory.venue,
-      description: 'Salón de lujo para eventos sociales.',
-      nextBooking: Booking(
-        customerName: 'Mariana López',
-        customerImageUrl: 'https://i.pravatar.cc/150?u=mariana',
-        date: DateTime(2025, 8, 20),
-        status: 'Confirmada',
-      ),
-    ),
-    ProductReservationSummary(
-      id: '2',
-      productName: 'Paquete DJ Básico',
-      category: ServiceCategory.dj,
-      description: 'Música e iluminación para fiestas.',
-      nextBooking: Booking(
-        customerName: 'Roberto Gómez',
-        customerImageUrl: 'https://i.pravatar.cc/150?u=roberto',
-        date: DateTime(2025, 8, 22),
-        status: 'Pendiente',
-      ),
-    ),
-  ];
+  ReservationsViewModel(this._repository);
 
-  List<ProductReservationSummary> get products => _products;
+  final ProviderReservationsRepository _repository;
 
-  void deleteProduct(String id) {
-    _products.removeWhere((p) => p.id == id);
-    notifyListeners();
+  List<ProductReservationSummary> _products = <ProductReservationSummary>[];
+  String? _errorMessage;
+
+  List<ProductReservationSummary> get products =>
+      List<ProductReservationSummary>.unmodifiable(_products);
+  String? get errorMessage => _errorMessage;
+
+  Future<void> initialise() async {
+    setBusy(true);
+    _errorMessage = null;
+
+    try {
+      _products = await _repository.fetchProducts();
+    } catch (error) {
+      _errorMessage = ProviderReservationsRepository.mapApiError(error);
+    } finally {
+      setBusy(false);
+      notifyListeners();
+    }
   }
 
-  void editProduct(BuildContext context, String id, ServiceCategory category) {
-    // CORRECCIÓN: Ahora redirige correctamente a la pantalla de edición
-    context.push(AppRoutes.providerEditProductRoute(category.name, id));
+  Future<String?> deleteProduct(String productId) async {
+    try {
+      await _repository.deleteProduct(productId);
+      _products = _products
+          .where((ProductReservationSummary item) => item.id != productId)
+          .toList();
+      notifyListeners();
+      return null;
+    } catch (error) {
+      return ProviderReservationsRepository.mapApiError(error);
+    }
+  }
+
+  void editProduct(
+    BuildContext context,
+    String productId,
+    ServiceCategory category,
+  ) {
+    final ProductReservationSummary product = _products.firstWhere(
+      (ProductReservationSummary item) => item.id == productId,
+    );
+
+    context.push(
+      AppRoutes.providerEditProductRoute(category.name, product.id),
+      extra: <String, String>{'serviceId': product.serviceId},
+    );
   }
 
   void manageAvailability(BuildContext context, String id, String name) {

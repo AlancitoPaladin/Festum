@@ -473,25 +473,6 @@ class EditProductView extends StatelessWidget {
           ),
         ]);
 
-      default:
-        return _buildCard([
-          _buildTextField(
-            'Nombre',
-            '',
-            initialValue: data.name,
-            onChanged: model.updateName,
-            inputKind: ProviderFieldInputKind.title,
-          ),
-          const SizedBox(height: 16),
-          _buildTextField(
-            'Precio',
-            '\$',
-            initialValue: data.price.toString(),
-            prefix: '\$',
-            onChanged: model.updatePrice,
-            inputKind: ProviderFieldInputKind.decimal,
-          ),
-        ]);
     }
   }
 

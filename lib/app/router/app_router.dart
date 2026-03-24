@@ -42,7 +42,7 @@ class AppRouter {
   final ProviderBusinessInfoStateService _providerBusinessInfoStateService;
 
   late final GoRouter router = GoRouter(
-    initialLocation: AppRoutes.providerHome,
+    initialLocation: AppRoutes.login,
     refreshListenable: Listenable.merge(<Listenable>[
       _authStateService,
       _registrationStateService,
@@ -251,6 +251,12 @@ class AppRouter {
       return _defaultRouteForRole(role);
     }
 
+    if (role == AccountRole.provider &&
+        _providerBusinessInfoStateService.requiresBusinessInfo &&
+        location != AppRoutes.providerBusinessInfo) {
+      return AppRoutes.providerBusinessInfo;
+    }
+
     if (role == AccountRole.client && isProviderRoute) {
       return AppRoutes.clientServices;
     }
@@ -266,7 +272,10 @@ class AppRouter {
     if (role == null) return null;
     switch (role) {
       case AccountRole.client: return AppRoutes.clientServices;
-      case AccountRole.provider: return AppRoutes.providerHome;
+      case AccountRole.provider:
+        return _providerBusinessInfoStateService.requiresBusinessInfo
+            ? AppRoutes.providerBusinessInfo
+            : AppRoutes.providerHome;
     }
   }
 }

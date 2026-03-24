@@ -13,7 +13,7 @@ class ProviderProfileView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ViewModelBuilder<ProviderProfileViewModel>.reactive(
-      viewModelBuilder: () => ProviderProfileViewModel(locator()),
+      viewModelBuilder: () => ProviderProfileViewModel(locator(), locator()),
       builder: (context, model, child) => Scaffold(
         backgroundColor: AppColors.background,
         appBar: const CustomAppBar(title: 'Mi Perfil'),

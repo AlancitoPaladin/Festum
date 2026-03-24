@@ -24,8 +24,13 @@ import 'package:festum/features/client/usecases/get_services_by_category_use_cas
 import 'package:festum/features/client/usecases/remove_client_cart_item_use_case.dart';
 import 'package:festum/features/client/usecases/restore_client_cart_item_use_case.dart';
 import 'package:festum/features/client/usecases/update_client_cart_quantity_use_case.dart';
+import 'package:festum/features/provider/repositories/provider_business_repository.dart';
+import 'package:festum/features/provider/repositories/provider_home_repository.dart';
+import 'package:festum/features/provider/repositories/provider_reservations_repository.dart';
+import 'package:festum/features/provider/repositories/provider_services_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final GetIt locator = GetIt.instance;
@@ -73,6 +78,19 @@ Future<void> setupLocator() async {
   locator.registerLazySingleton<AuthRepository>(
     () => AuthRepository(locator<ApiClient>()),
   );
+  locator.registerLazySingleton<ProviderHomeRepository>(
+    () => ProviderHomeRepository(locator<ApiClient>()),
+  );
+  locator.registerLazySingleton<ProviderBusinessRepository>(
+    () => ProviderBusinessRepository(locator<ApiClient>()),
+  );
+  locator.registerLazySingleton<ProviderReservationsRepository>(
+    () => ProviderReservationsRepository(locator<ApiClient>()),
+  );
+  locator.registerLazySingleton<ProviderServicesRepository>(
+    () => ProviderServicesRepository(locator<ApiClient>()),
+  );
+  locator.registerLazySingleton<ImagePicker>(ImagePicker.new);
 
   locator.registerLazySingleton<ClientServicesRepository>(
     MockClientServicesRepository.new,
@@ -110,6 +128,7 @@ Future<void> setupLocator() async {
   );
 
   await _validateExistingSession();
+  await _syncProviderBusinessInfoProgress();
 
   locator.registerLazySingleton<RegistrationStateService>(
     () => RegistrationStateService(locator<SharedPreferences>()),
@@ -157,4 +176,32 @@ bool _shouldSkipSessionValidation() {
   return baseUrl.contains('127.0.0.1') ||
       baseUrl.contains('10.0.2.2') ||
       baseUrl.contains('localhost');
+}
+
+Future<void> _syncProviderBusinessInfoProgress() async {
+  final AuthStateService authStateService = locator<AuthStateService>();
+  if (!authStateService.isAuthenticated ||
+      authStateService.role != AccountRole.provider) {
+    return;
+  }
+
+  try {
+    final profile = await locator<ProviderBusinessRepository>().fetchProfile();
+    final bool hasCompletedBusinessInfo =
+        profile.businessName.trim().isNotEmpty ||
+        profile.location.trim().isNotEmpty ||
+        profile.coverageArea.trim().isNotEmpty ||
+        profile.contactNumber.trim().isNotEmpty ||
+        profile.logoUrl.trim().isNotEmpty ||
+        profile.photoUrls.isNotEmpty;
+
+    await locator<ProviderBusinessInfoStateService>().syncBusinessInfoProgress(
+      hasCompletedBusinessInfo,
+    );
+  } on DioException catch (error) {
+    if (error.response?.statusCode == 404) {
+      await locator<ProviderBusinessInfoStateService>()
+          .syncBusinessInfoProgress(false);
+    }
+  }
 }

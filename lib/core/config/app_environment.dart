@@ -6,9 +6,6 @@ class AppEnvironment {
   static const String _apiBaseUrlFromDefine =
       String.fromEnvironment('API_BASE_URL');
 
-  // Usa loopback local para debug en iOS/simulador/desktop.
-  // Para Android emulator usa: --dart-define=API_BASE_URL=http://10.0.2.2:8000
-  static const String _localApiBaseUrl = 'http://127.0.0.1:8000';
   static const String _productionApiBaseUrl = 'https://api.example.com';
 
   static String get apiBaseUrl {
@@ -16,6 +13,16 @@ class AppEnvironment {
       return _apiBaseUrlFromDefine;
     }
 
-    return kReleaseMode ? _productionApiBaseUrl : _localApiBaseUrl;
+    if (kReleaseMode) {
+      return _productionApiBaseUrl;
+    }
+
+    // En Android emulator, 10.0.2.2 apunta al localhost de la máquina host.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8000';
+    }
+
+    // iOS simulator y desktop pueden usar loopback directo.
+    return 'http://127.0.0.1:8000';
   }
 }

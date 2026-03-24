@@ -32,4 +32,17 @@ class ProviderBusinessInfoStateService extends ChangeNotifier {
     await _prefs.setBool(_hasCompletedBusinessInfoKey, false);
     notifyListeners();
   }
+
+  Future<void> syncBusinessInfoProgress(bool hasCompletedBusinessInfo) async {
+    if (_hasCompletedBusinessInfo == hasCompletedBusinessInfo) {
+      return;
+    }
+
+    _hasCompletedBusinessInfo = hasCompletedBusinessInfo;
+    await _prefs.setBool(
+      _hasCompletedBusinessInfoKey,
+      hasCompletedBusinessInfo,
+    );
+    notifyListeners();
+  }
 }

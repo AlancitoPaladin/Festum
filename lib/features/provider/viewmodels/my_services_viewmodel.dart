@@ -1,24 +1,60 @@
 import 'package:festum/features/provider/models/provider_service.dart';
-import 'package:festum/features/provider/models/service_category.dart';
+import 'package:festum/features/provider/repositories/provider_services_repository.dart';
 import 'package:stacked/stacked.dart';
 
 class MyServicesViewModel extends BaseViewModel {
-  final List<ProviderService> _services = [
-    ProviderService(id: '1', name: 'DJ para eventos', category: ServiceCategory.dj),
-    ProviderService(id: '2', name: 'Renta de mobiliario', category: ServiceCategory.furniture, isActive: false),
-    ProviderService(id: '3', name: 'Banquetes y catering', category: ServiceCategory.banquet),
-    ProviderService(id: '4', name: 'Salón de eventos', category: ServiceCategory.venue),
-  ];
+  MyServicesViewModel(this._repository);
 
-  List<ProviderService> get services => _services;
+  final ProviderServicesRepository _repository;
 
-  void toggleServiceStatus(int index) {
-    _services[index].isActive = !_services[index].isActive;
-    notifyListeners();
+  List<ProviderService> _services = <ProviderService>[];
+  String? _errorMessage;
+
+  List<ProviderService> get services =>
+      List<ProviderService>.unmodifiable(_services);
+  String? get errorMessage => _errorMessage;
+
+  Future<void> initialise() async {
+    setBusy(true);
+    _errorMessage = null;
+
+    try {
+      _services = await _repository.fetchServices();
+    } catch (error) {
+      _errorMessage = ProviderServicesRepository.mapApiError(error);
+    } finally {
+      setBusy(false);
+      notifyListeners();
+    }
   }
 
-  void deleteService(int index) {
-    _services.removeAt(index);
-    notifyListeners();
+  Future<String?> toggleServiceStatus(int index) async {
+    final ProviderService current = _services[index];
+    final String newStatus = current.isActive ? 'inactive' : 'active';
+
+    try {
+      final ProviderService updated = await _repository.updateStatus(
+        current.id,
+        newStatus,
+      );
+      _services[index] = updated;
+      notifyListeners();
+      return null;
+    } catch (error) {
+      return ProviderServicesRepository.mapApiError(error);
+    }
+  }
+
+  Future<String?> deleteService(int index) async {
+    final ProviderService service = _services[index];
+
+    try {
+      await _repository.deleteService(service.id);
+      _services.removeAt(index);
+      notifyListeners();
+      return null;
+    } catch (error) {
+      return ProviderServicesRepository.mapApiError(error);
+    }
   }
 }

@@ -447,21 +447,6 @@ class AddProductView extends StatelessWidget {
           ),
         ]);
 
-      default:
-        return _buildCard([
-          _buildTextField(
-            'Nombre',
-            '',
-            onChanged: model.updateName,
-            inputKind: ProviderFieldInputKind.title,
-          ),
-          const SizedBox(height: 16),
-          DynamicSelectionList(
-            title: 'Políticas',
-            items: data.policies,
-            onToggle: model.togglePolicy,
-          ),
-        ]);
     }
   }
 

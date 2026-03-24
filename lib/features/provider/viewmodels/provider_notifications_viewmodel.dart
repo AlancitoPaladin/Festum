@@ -3,27 +3,31 @@ import 'package:stacked/stacked.dart';
 
 class ProviderNotificationsViewModel extends BaseViewModel {
   final List<ProviderNotification> _notifications = <ProviderNotification>[
-    const ProviderNotification(
+    ProviderNotification(
+      id: 'mock-notification-1',
       title: 'Nueva reserva recibida',
       subtitle: 'Mariana Lopez solicito informacion para el 20 de agosto.',
-      timeLabel: 'Hace 5 min',
+      createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
       isUnread: true,
     ),
-    const ProviderNotification(
+    ProviderNotification(
+      id: 'mock-notification-2',
       title: 'Recordatorio de evento',
       subtitle: 'Tienes un servicio programado para manana a las 18:00.',
-      timeLabel: 'Hace 1 hora',
+      createdAt: DateTime.now().subtract(const Duration(hours: 1)),
       isUnread: true,
     ),
-    const ProviderNotification(
+    ProviderNotification(
+      id: 'mock-notification-3',
       title: 'Servicio actualizado',
       subtitle: 'Los cambios en DJ Sonido Fiesta se guardaron correctamente.',
-      timeLabel: 'Ayer',
+      createdAt: DateTime.now().subtract(const Duration(days: 1)),
     ),
-    const ProviderNotification(
+    ProviderNotification(
+      id: 'mock-notification-4',
       title: 'Pago confirmado',
       subtitle: 'Se confirmo el anticipo de una reserva reciente.',
-      timeLabel: 'Hace 2 dias',
+      createdAt: DateTime.now().subtract(const Duration(days: 2)),
     ),
   ];
 

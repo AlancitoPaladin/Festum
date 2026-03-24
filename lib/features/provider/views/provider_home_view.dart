@@ -1,7 +1,10 @@
+import 'package:festum/core/di/app_locator.dart';
+import 'package:festum/core/network/api_url_resolver.dart';
 import 'package:festum/core/theme/app_colors.dart';
+import 'package:festum/features/provider/models/provider_home_response.dart';
 import 'package:festum/features/provider/models/provider_notification.dart';
 import 'package:festum/features/provider/models/provider_tab.dart';
-import 'package:festum/features/provider/viewmodels/provider_notifications_viewmodel.dart';
+import 'package:festum/features/provider/viewmodels/provider_home_viewmodel.dart';
 import 'package:festum/features/provider/views/my_services_view.dart';
 import 'package:festum/features/provider/views/provider_profile_view.dart';
 import 'package:festum/features/provider/views/reservations_view.dart';
@@ -54,105 +57,146 @@ class _HomeTabBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ViewModelBuilder<ProviderNotificationsViewModel>.reactive(
-      viewModelBuilder: () => ProviderNotificationsViewModel(),
-      builder: (context, model, child) => SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 40),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return ViewModelBuilder<ProviderHomeViewModel>.reactive(
+      viewModelBuilder: () => ProviderHomeViewModel(locator()),
+      onViewModelReady: (ProviderHomeViewModel model) => model.initialize(),
+      builder: (context, model, child) {
+        if (model.isBusy && !model.hasContent) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (model.errorMessage != null && !model.hasContent) {
+          return _HomeErrorState(
+            message: model.errorMessage!,
+            onRetry: model.refresh,
+          );
+        }
+
+        final ProviderHomeResponse? home = model.home;
+        final List<ProviderFeaturedService> featuredServices =
+            home?.featuredServices ?? const <ProviderFeaturedService>[];
+        final String businessName = home?.businessName.trim().isNotEmpty == true
+            ? home!.businessName.trim()
+            : '';
+        final String displayName = home?.displayName.trim().isNotEmpty == true
+            ? home!.displayName.trim()
+            : 'Proveedor';
+        final String headerName = businessName.isNotEmpty
+            ? businessName
+            : displayName;
+        final String subtitle = businessName.isNotEmpty
+            ? displayName
+            : 'Administra tu negocio';
+
+        return RefreshIndicator(
+          onRefresh: model.refresh,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 40),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Hola, Jair',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primaryText,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Hola, $headerName',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryText,
+                            ),
+                          ),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.secondaryText.withValues(
+                                alpha: 0.7,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Text(
-                      'Administra tu negocio',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.secondaryText.withValues(alpha: 0.7),
-                      ),
+                    Row(
+                      children: [
+                        _NotificationsButton(
+                          unreadCount: model.unreadCount,
+                          onTap: () => _showNotificationsSheet(context, model),
+                        ),
+                        const SizedBox(width: 16),
+                        _ProviderAvatar(imageUrl: home?.avatarUrl ?? ''),
+                      ],
                     ),
                   ],
                 ),
+                const SizedBox(height: 32),
+                const Text(
+                  'Estadisticas rapidas',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
                 Row(
                   children: [
-                    _NotificationsButton(
-                      unreadCount: model.unreadCount,
-                      onTap: () => _showNotificationsSheet(context, model),
+                    Expanded(
+                      child: StatCard(
+                        title: 'Reservas',
+                        value:
+                            '${home?.quickStats.reservationsThisMonth ?? 0}',
+                        subtitle: 'este mes',
+                        icon: Icons.calendar_today,
+                      ),
                     ),
                     const SizedBox(width: 16),
-                    const CircleAvatar(
-                      backgroundImage:
-                          NetworkImage('https://i.pravatar.cc/150?u=jair'),
-                      radius: 20,
+                    Expanded(
+                      child: StatCard(
+                        title: 'Servicios activos',
+                        value: '${home?.quickStats.activeServices ?? 0}',
+                        subtitle: 'activos',
+                        icon: Icons.room_service_outlined,
+                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              'Estadisticas rapidas',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            const Row(
-              children: [
-                Expanded(
-                  child: StatCard(
-                    title: 'Reservas',
-                    value: '12',
-                    subtitle: 'este mes',
-                    icon: Icons.calendar_today,
+                const SizedBox(height: 32),
+                const Text(
+                  'Mis servicios destacados',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                if (featuredServices.isEmpty)
+                  const _EmptyFeaturedServicesState(),
+                ...featuredServices.map(
+                  (ProviderFeaturedService service) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: ServiceItemCard(
+                      title: service.title,
+                      category: service.category,
+                      status: service.status,
+                      info: service.priceLabel,
+                      reservations: service.reservations,
+                      imageUrl: service.imageUrl,
+                    ),
                   ),
                 ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: StatCard(
-                    title: 'Servicios activos',
-                    value: '3',
-                    subtitle: 'activos',
-                    icon: Icons.calendar_today,
-                  ),
-                ),
+                const SizedBox(height: 24),
               ],
             ),
-            const SizedBox(height: 32),
-            const Text(
-              'Mis servicios destacados',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            const ServiceItemCard(
-              title: 'DJ Sonido Fiesta',
-              category: 'Musica',
-              status: 'Activo',
-              info: '23 de 330',
-              reservations: 6,
-              imageUrl:
-                  'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500',
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   void _showNotificationsSheet(
     BuildContext context,
-    ProviderNotificationsViewModel model,
+    ProviderHomeViewModel model,
   ) {
     showModalBottomSheet<void>(
       context: context,
@@ -212,12 +256,12 @@ class _HomeTabBody extends StatelessWidget {
                         ),
                         if (model.notifications.isNotEmpty)
                           TextButton(
-                            onPressed: model.clearAll,
+                            onPressed: () => model.clearAll(),
                             child: const Text('Borrar todo'),
                           ),
                         if (model.unreadCount > 0)
                           TextButton(
-                            onPressed: model.markAllAsRead,
+                            onPressed: () => model.markAllAsRead(),
                             child: const Text('Marcar todo'),
                           ),
                         TextButton(
@@ -240,7 +284,7 @@ class _HomeTabBody extends StatelessWidget {
                                   model.notifications[index];
                               return _NotificationCard(
                                 item: item,
-                                onTap: () => model.markAsRead(index),
+                                onTap: () => model.markAsRead(item.id),
                               );
                             },
                           ),
@@ -251,6 +295,98 @@ class _HomeTabBody extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _ProviderAvatar extends StatelessWidget {
+  const _ProviderAvatar({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final String resolvedImageUrl = resolveApiAssetUrl(imageUrl);
+
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: AppColors.backgroundElevated,
+      backgroundImage: resolvedImageUrl.isEmpty
+          ? null
+          : NetworkImage(resolvedImageUrl),
+      child: resolvedImageUrl.isEmpty
+          ? const Icon(
+              Icons.person_outline,
+              color: AppColors.secondaryText,
+            )
+          : null,
+    );
+  }
+}
+
+class _HomeErrorState extends StatelessWidget {
+  const _HomeErrorState({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.wifi_off_rounded,
+              color: AppColors.secondaryText,
+              size: 34,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.secondaryText,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => onRetry(),
+              child: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyFeaturedServicesState extends StatelessWidget {
+  const _EmptyFeaturedServicesState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+      ),
+      child: const Text(
+        'Todavia no tienes servicios destacados para mostrar aqui.',
+        style: TextStyle(
+          color: AppColors.secondaryText,
+          height: 1.35,
+        ),
+      ),
     );
   }
 }
