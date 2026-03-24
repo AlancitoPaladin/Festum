@@ -14,7 +14,7 @@ Future<void> main() async {
       routerConfig: router,
       theme: ThemeData(
         useMaterial3: true,
-        fontFamily: 'PlusJakartaSans', // O la que use tu proyecto
+        fontFamily: 'PlusJakartaSans',
       ),
     ),
   );

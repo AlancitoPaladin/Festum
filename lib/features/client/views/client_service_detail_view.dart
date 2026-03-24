@@ -1,13 +1,19 @@
+import 'dart:ui';
+
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
 import 'package:festum/features/client/models/client_tab.dart';
+import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
+import 'package:festum/features/client/usecases/add_service_to_cart_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_service_by_id_use_case.dart';
+import 'package:festum/features/client/usecases/is_service_in_cart_use_case.dart';
 import 'package:festum/features/client/widgets/client_feedback.dart';
 import 'package:festum/features/client/widgets/client_shell_scaffold.dart';
 import 'package:festum/features/client/widgets/client_status_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 class ClientServiceDetailView extends StatefulWidget {
@@ -27,8 +33,12 @@ class ClientServiceDetailView extends StatefulWidget {
 
 class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
   late final GetClientServiceByIdUseCase _getClientServiceByIdUseCase;
+  late final AddServiceToCartUseCase _addServiceToCartUseCase;
+  late final IsServiceInCartUseCase _isServiceInCartUseCase;
 
   bool _isLoading = true;
+  bool _isAddingToCart = false;
+  bool _isInCart = false;
   String? _errorMessage;
   ClientServiceItem? _service;
 
@@ -36,6 +46,8 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
   void initState() {
     super.initState();
     _getClientServiceByIdUseCase = locator<GetClientServiceByIdUseCase>();
+    _addServiceToCartUseCase = locator<AddServiceToCartUseCase>();
+    _isServiceInCartUseCase = locator<IsServiceInCartUseCase>();
     _loadDetail(showLoader: true);
   }
 
@@ -65,6 +77,11 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
         _errorMessage = null;
         _isLoading = false;
       });
+      final bool isInCart = await _isServiceInCartUseCase(result.id);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isInCart = isInCart);
     } catch (_) {
       if (!mounted) {
         return;
@@ -74,6 +91,43 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _addCurrentServiceToCart() async {
+    final ClientServiceItem? service = _service;
+    if (service == null || _isInCart || _isAddingToCart) {
+      return;
+    }
+
+    setState(() => _isAddingToCart = true);
+    final bool added = await _addServiceToCartUseCase(
+      serviceId: service.id,
+      name: service.name,
+      unitPriceCents: service.unitPriceCents,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() => _isAddingToCart = false);
+
+    if (!added) {
+      setState(() => _isInCart = true);
+      ClientFeedback.showMessage(
+        context,
+        message: 'Este servicio ya está en el carrito.',
+      );
+      HapticFeedback.selectionClick();
+      return;
+    }
+
+    final ClientTabUiStateService tabState = locator<ClientTabUiStateService>();
+    tabState.setCartCount(tabState.badgeFor(ClientTab.cart) + 1);
+    setState(() => _isInCart = true);
+    ClientFeedback.showMessage(
+      context,
+      message: 'Servicio agregado al carrito.',
+    );
+    HapticFeedback.lightImpact();
   }
 
   @override
@@ -177,12 +231,10 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
             minimum: const EdgeInsets.only(bottom: 60),
             child: _BottomCta(
               priceLabel: service.priceLabel,
-              onAdd: () {
-                ClientFeedback.showMessage(
-                  context,
-                  message: 'Servicio agregado al carrito.',
-                );
-              },
+              isAdded: _isInCart,
+              isAdding: _isAddingToCart,
+              onAdd: _addCurrentServiceToCart,
+              onOpenCart: () => context.go(AppRoutes.clientCart),
             ),
           ),
         ),
@@ -215,7 +267,13 @@ class _HeroGallery extends StatelessWidget {
               Positioned(
                 right: 16,
                 top: 16,
-                child: _Badge(label: service.badge),
+                child: Hero(
+                  tag: 'client-service-badge-${service.id}',
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: _Badge(label: service.badge),
+                  ),
+                ),
               ),
               Align(
                 alignment: Alignment.center,
@@ -279,7 +337,16 @@ class _ServiceHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(service.name, style: Theme.of(context).textTheme.headlineSmall),
+        Hero(
+          tag: 'client-service-title-${service.id}',
+          child: Material(
+            type: MaterialType.transparency,
+            child: Text(
+              service.name,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+          ),
+        ),
         const SizedBox(height: 6),
         Text(service.subtitle),
         const SizedBox(height: 10),
@@ -418,42 +485,77 @@ class _InfoSection extends StatelessWidget {
 }
 
 class _BottomCta extends StatelessWidget {
-  const _BottomCta({required this.priceLabel, required this.onAdd});
+  const _BottomCta({
+    required this.priceLabel,
+    required this.isAdded,
+    required this.isAdding,
+    required this.onAdd,
+    required this.onOpenCart,
+  });
 
   final String priceLabel;
+  final bool isAdded;
+  final bool isAdding;
   final VoidCallback onAdd;
+  final VoidCallback onOpenCart;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.backgroundElevated,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Total desde',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  Text(
-                    priceLabel,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.backgroundElevated.withValues(alpha: 0.82),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.outline.withValues(alpha: 0.3)),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: AppColors.primaryText.withValues(alpha: 0.12),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Total desde',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      Text(
+                        priceLabel,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: isAdding ? null : (isAdded ? onOpenCart : onAdd),
+                  icon: Icon(
+                    isAdded
+                        ? Icons.shopping_cart_checkout_rounded
+                        : isAdding
+                        ? Icons.hourglass_top_rounded
+                        : Icons.add_shopping_cart_rounded,
+                  ),
+                  label: Text(
+                    isAdded
+                        ? 'Ver carrito'
+                        : (isAdding ? 'Agregando...' : 'Agregar'),
+                  ),
+                ),
+              ],
             ),
-            FilledButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add_shopping_cart_rounded),
-              label: const Text('Agregar'),
-            ),
-          ],
+          ),
         ),
       ),
     );

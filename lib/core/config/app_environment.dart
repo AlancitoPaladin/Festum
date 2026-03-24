@@ -3,10 +3,15 @@ import 'package:flutter/foundation.dart';
 class AppEnvironment {
   const AppEnvironment._();
 
-  static const String _apiBaseUrlFromDefine =
-      String.fromEnvironment('API_BASE_URL');
+  static const String _apiBaseUrlFromDefine = String.fromEnvironment(
+    'API_BASE_URL',
+  );
 
   static const String _productionApiBaseUrl = 'https://api.example.com';
+  static const bool _useClientMocksFromDefine = bool.fromEnvironment(
+    'USE_CLIENT_MOCKS',
+    defaultValue: true,
+  );
 
   static String get apiBaseUrl {
     if (_apiBaseUrlFromDefine.isNotEmpty) {
@@ -25,4 +30,6 @@ class AppEnvironment {
     // iOS simulator y desktop pueden usar loopback directo.
     return 'http://127.0.0.1:8000';
   }
+
+  static bool get useClientMocks => _useClientMocksFromDefine;
 }

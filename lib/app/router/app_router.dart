@@ -7,6 +7,7 @@ import 'package:festum/features/auth/views/registration_view.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
 import 'package:festum/features/client/models/client_tab.dart';
 import 'package:festum/features/client/views/client_cart_view.dart';
+import 'package:festum/features/client/views/client_checkout_success_view.dart';
 import 'package:festum/features/client/views/client_home_view.dart';
 import 'package:festum/features/client/views/client_orders_view.dart';
 import 'package:festum/features/client/views/client_service_detail_view.dart';
@@ -72,7 +73,8 @@ class AppRouter {
       ),
       GoRoute(
         path: AppRoutes.home,
-        redirect: (context, state) => _defaultRouteForRole(_authStateService.role),
+        redirect: (context, state) =>
+            _defaultRouteForRole(_authStateService.role),
       ),
       GoRoute(
         path: AppRoutes.clientHome,
@@ -122,6 +124,23 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.clientOrders,
         builder: (context, state) => const ClientOrdersView(),
+      ),
+      GoRoute(
+        path: AppRoutes.clientCheckoutSuccess,
+        builder: (context, state) {
+          final String orderId = state.pathParameters['orderId'] ?? '';
+          final String title =
+              state.uri.queryParameters['title'] ?? 'New order';
+          final String total = state.uri.queryParameters['total'] ?? '-';
+          if (orderId.isEmpty) {
+            return const ClientOrdersView();
+          }
+          return ClientCheckoutSuccessView(
+            orderId: orderId,
+            title: title,
+            totalLabel: total,
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.providerHome,
@@ -210,7 +229,9 @@ class AppRouter {
         path: AppRoutes.providerAddProduct,
         builder: (context, state) {
           final categorySlug = state.pathParameters['category']!;
-          final category = ServiceCategory.values.firstWhere((e) => e.name == categorySlug);
+          final category = ServiceCategory.values.firstWhere(
+            (e) => e.name == categorySlug,
+          );
           return AddProductView(category: category);
         },
       ),
@@ -219,7 +240,9 @@ class AppRouter {
         builder: (context, state) {
           final categorySlug = state.pathParameters['category']!;
           final productId = state.pathParameters['productId']!;
-          final category = ServiceCategory.values.firstWhere((e) => e.name == categorySlug);
+          final category = ServiceCategory.values.firstWhere(
+            (e) => e.name == categorySlug,
+          );
           return EditProductView(category: category, productId: productId);
         },
       ),
@@ -238,13 +261,17 @@ class AppRouter {
     final bool isAuthenticated = _authStateService.isAuthenticated;
     final AccountRole? role = _authStateService.role;
     final String location = state.matchedLocation;
-    final bool isAuthRoute = location == AppRoutes.login ||
+    final bool isAuthRoute =
+        location == AppRoutes.login ||
         location == AppRoutes.registrationType ||
         location.startsWith('/registro/');
     final bool isProviderRoute = location.startsWith('/provider/');
     final bool isClientRoute = location.startsWith('/client/');
     if (!isAuthenticated) {
-      return null;
+      if (isAuthRoute) {
+        return null;
+      }
+      return AppRoutes.login;
     }
 
     if (isAuthRoute) {
@@ -272,10 +299,7 @@ class AppRouter {
     if (role == null) return null;
     switch (role) {
       case AccountRole.client: return AppRoutes.clientServices;
-      case AccountRole.provider:
-        return _providerBusinessInfoStateService.requiresBusinessInfo
-            ? AppRoutes.providerBusinessInfo
-            : AppRoutes.providerHome;
+      case AccountRole.provider: return AppRoutes.providerHome;
     }
   }
 }

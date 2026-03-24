@@ -1,13 +1,18 @@
+import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/features/client/models/client_order_item.dart';
 import 'package:festum/features/client/models/client_tab.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
 import 'package:festum/features/client/usecases/get_client_orders_use_case.dart';
+import 'package:festum/features/client/usecases/update_client_order_status_use_case.dart';
 import 'package:festum/features/client/widgets/client_feedback.dart';
 import 'package:festum/features/client/widgets/client_shell_scaffold.dart';
 import 'package:festum/features/client/widgets/client_status_view.dart';
+import 'package:festum/features/client/widgets/order_status_chip.dart';
+import 'package:festum/features/client/widgets/staggered_appear.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class ClientOrdersView extends StatefulWidget {
   const ClientOrdersView({super.key});
@@ -18,17 +23,20 @@ class ClientOrdersView extends StatefulWidget {
 
 class _ClientOrdersViewState extends State<ClientOrdersView> {
   late final GetClientOrdersUseCase _getClientOrdersUseCase;
+  late final UpdateClientOrderStatusUseCase _updateClientOrderStatusUseCase;
   late final ClientTabUiStateService _tabUiStateService;
   late final ScrollController _scrollController;
 
   bool _isLoading = true;
   String? _errorMessage;
   List<ClientOrderItem> _orders = <ClientOrderItem>[];
+  Set<String> _highlightedOrderIds = <String>{};
 
   @override
   void initState() {
     super.initState();
     _getClientOrdersUseCase = locator<GetClientOrdersUseCase>();
+    _updateClientOrderStatusUseCase = locator<UpdateClientOrderStatusUseCase>();
     _tabUiStateService = locator<ClientTabUiStateService>();
     _scrollController = ScrollController(
       initialScrollOffset: _tabUiStateService.scrollOffsetFor(ClientTab.orders),
@@ -57,7 +65,19 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
     }
 
     try {
+      final Map<String, ClientOrderStatus> previousStatuses =
+          <String, ClientOrderStatus>{
+            for (final ClientOrderItem item in _orders) item.id: item.status,
+          };
       final List<ClientOrderItem> result = await _getClientOrdersUseCase();
+      final Set<String> changedOrderIds = result
+          .where(
+            (ClientOrderItem item) =>
+                previousStatuses[item.id] != null &&
+                previousStatuses[item.id] != item.status,
+          )
+          .map((ClientOrderItem item) => item.id)
+          .toSet();
       if (!mounted) {
         return;
       }
@@ -65,7 +85,23 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
         _orders = result;
         _errorMessage = null;
         _isLoading = false;
+        _highlightedOrderIds = <String>{
+          ..._highlightedOrderIds,
+          ...changedOrderIds,
+        };
       });
+      if (changedOrderIds.isNotEmpty) {
+        Future<void>.delayed(const Duration(milliseconds: 720), () {
+          if (!mounted) {
+            return;
+          }
+          setState(
+            () =>
+                _highlightedOrderIds = <String>{..._highlightedOrderIds}
+                  ..removeAll(changedOrderIds),
+          );
+        });
+      }
       _tabUiStateService.setOrdersCount(result.length);
       if (!showLoader) {
         ClientFeedback.showMessage(context, message: 'Órdenes actualizadas');
@@ -110,6 +146,8 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
       return ClientStatusView.empty(
         title: 'No tienes órdenes todavía',
         message: 'Cuando realices una reserva aparecerá en esta sección.',
+        onPrimaryAction: () => context.go(AppRoutes.clientServices),
+        primaryActionLabel: 'Explorar servicios',
         onRetry: () => _loadOrders(showLoader: true),
         retryLabel: 'Actualizar',
       );
@@ -125,18 +163,35 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (BuildContext context, int index) {
         final ClientOrderItem order = _orders[index];
-        return Card(
-          child: ListTile(
-            leading: const Icon(Icons.receipt_long_rounded),
-            title: Text('Orden #${order.id} - ${order.title}'),
-            subtitle: Text(
-              'Estado: ${order.status} • Total: ${order.totalLabel}',
+        return StaggeredAppear(
+          index: index,
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutBack,
+            scale: _highlightedOrderIds.contains(order.id) ? 1.015 : 1,
+            child: Card(
+              child: ListTile(
+                leading: const Icon(Icons.receipt_long_rounded),
+                title: Text('Orden #${order.id} - ${order.title}'),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      OrderStatusChip(status: order.status),
+                      const SizedBox(height: 6),
+                      Text('Total: ${order.totalLabel}'),
+                    ],
+                  ),
+                ),
+                trailing: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.secondaryText,
+                ),
+                onTap: () => _openOrderDetail(order),
+              ),
             ),
-            trailing: const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.secondaryText,
-            ),
-            onTap: () => _openOrderDetail(order),
           ),
         );
       },
@@ -144,6 +199,10 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
   }
 
   Future<void> _openOrderDetail(ClientOrderItem order) async {
+    final _OrderPrimaryAction action = _primaryActionFor(order.status);
+    final bool canCancel = order.status.canTransitionTo(
+      ClientOrderStatus.cancelled,
+    );
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -170,7 +229,18 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
-                _OrderMetaRow(label: 'Estado', value: order.status),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        'Estado',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                    OrderStatusChip(status: order.status),
+                  ],
+                ),
+                const SizedBox(height: 4),
                 _OrderMetaRow(label: 'Total estimado', value: order.totalLabel),
                 const SizedBox(height: 16),
                 Text(
@@ -192,16 +262,278 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      ClientFeedback.showMessage(
-                        this.context,
-                        message: 'Factura enviada al correo registrado.',
-                      );
-                    },
-                    icon: const Icon(Icons.file_download_outlined),
-                    label: const Text('Descargar comprobante'),
+                    onPressed: action.enabled
+                        ? () => _handlePrimaryAction(order)
+                        : null,
+                    icon: Icon(action.icon),
+                    label: Text(action.label),
                   ),
+                ),
+                if (canCancel) ...<Widget>[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      onPressed: () => _confirmCancelOrder(order),
+                      icon: const Icon(Icons.cancel_outlined),
+                      label: const Text('Cancelar orden'),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cerrar'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handlePrimaryAction(ClientOrderItem order) async {
+    Navigator.of(context).pop();
+    switch (order.status) {
+      case ClientOrderStatus.pendingPayment:
+        final bool? paid = await _showPaymentSheet(order);
+        if (paid == true) {
+          await _transitionOrderStatus(
+            order: order,
+            target: ClientOrderStatus.confirmed,
+            successMessage: 'Pago confirmado. Tu orden ahora está confirmada.',
+          );
+        }
+        return;
+      case ClientOrderStatus.confirmed:
+        await _showContractSummarySheet(order);
+        return;
+      case ClientOrderStatus.inProgress:
+        await _showProviderContactSheet(order);
+        return;
+      case ClientOrderStatus.completed:
+        await _showRatingSheet(order);
+        return;
+      case ClientOrderStatus.cancelled:
+        ClientFeedback.showMessage(
+          context,
+          message: 'Esta orden está cancelada y no admite acciones.',
+        );
+        return;
+    }
+  }
+
+  Future<void> _transitionOrderStatus({
+    required ClientOrderItem order,
+    required ClientOrderStatus target,
+    required String successMessage,
+  }) async {
+    if (!order.status.canTransitionTo(target)) {
+      ClientFeedback.showMessage(
+        context,
+        message: 'La acción no está permitida para el estado actual.',
+      );
+      return;
+    }
+
+    await _updateClientOrderStatusUseCase(orderId: order.id, status: target);
+    if (!mounted) {
+      return;
+    }
+    await _loadOrders(showLoader: false);
+    if (!mounted) {
+      return;
+    }
+    ClientFeedback.showMessage(context, message: successMessage);
+  }
+
+  Future<void> _confirmCancelOrder(ClientOrderItem order) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Cancelar orden'),
+          content: Text(
+            '¿Seguro que deseas cancelar la orden #${order.id}? Esta acción no se puede deshacer.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('No'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Sí, cancelar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop();
+    await _transitionOrderStatus(
+      order: order,
+      target: ClientOrderStatus.cancelled,
+      successMessage: 'Tu orden fue cancelada correctamente.',
+    );
+  }
+
+  Future<bool?> _showPaymentSheet(ClientOrderItem order) {
+    _PaymentMethodOption selected = _PaymentMethodOption.savedCard;
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Confirmar pago',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Orden #${order.id} • ${order.totalLabel}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.secondaryText,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _PaymentMethodTile(
+                      option: _PaymentMethodOption.savedCard,
+                      isSelected: selected == _PaymentMethodOption.savedCard,
+                      onTap: () => setModalState(
+                        () => selected = _PaymentMethodOption.savedCard,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _PaymentMethodTile(
+                      option: _PaymentMethodOption.spei,
+                      isSelected: selected == _PaymentMethodOption.spei,
+                      onTap: () => setModalState(
+                        () => selected = _PaymentMethodOption.spei,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        icon: const Icon(Icons.lock_rounded),
+                        label: const Text('Pagar de forma segura'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showContractSummarySheet(ClientOrderItem order) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Resumen del contrato',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Orden #${order.id}\nServicio: ${order.title}\nTotal: ${order.totalLabel}',
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cerrar'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showProviderContactSheet(ClientOrderItem order) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Canales de contacto',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 10),
+                const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.call_outlined),
+                  title: Text('Llamada'),
+                  subtitle: Text('+52 222 000 0000'),
+                ),
+                const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.chat_outlined),
+                  title: Text('Chat interno'),
+                  subtitle: Text('Respuesta estimada: 5-10 min'),
                 ),
                 const SizedBox(height: 8),
                 SizedBox(
@@ -216,6 +548,208 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _showRatingSheet(ClientOrderItem order) async {
+    int selectedStars = 5;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Calificar servicio',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(order.title),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      children: List<Widget>.generate(5, (int index) {
+                        final int star = index + 1;
+                        final bool active = star <= selectedStars;
+                        return IconButton.filledTonal(
+                          onPressed: () =>
+                              setModalState(() => selectedStars = star),
+                          icon: Icon(
+                            active
+                                ? Icons.star_rounded
+                                : Icons.star_border_rounded,
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          ClientFeedback.showMessage(
+                            this.context,
+                            message: 'Gracias. Tu calificación fue enviada.',
+                          );
+                        },
+                        child: const Text('Enviar evaluación'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  _OrderPrimaryAction _primaryActionFor(ClientOrderStatus status) {
+    switch (status) {
+      case ClientOrderStatus.pendingPayment:
+        return const _OrderPrimaryAction(
+          label: 'Pagar ahora',
+          icon: Icons.credit_card_rounded,
+          enabled: true,
+        );
+      case ClientOrderStatus.confirmed:
+        return const _OrderPrimaryAction(
+          label: 'Ver detalles',
+          icon: Icons.description_outlined,
+          enabled: true,
+        );
+      case ClientOrderStatus.inProgress:
+        return const _OrderPrimaryAction(
+          label: 'Contactar proveedor',
+          icon: Icons.chat_bubble_outline_rounded,
+          enabled: true,
+        );
+      case ClientOrderStatus.completed:
+        return const _OrderPrimaryAction(
+          label: 'Calificar servicio',
+          icon: Icons.star_outline_rounded,
+          enabled: true,
+        );
+      case ClientOrderStatus.cancelled:
+        return const _OrderPrimaryAction(
+          label: 'Orden cancelada',
+          icon: Icons.block_rounded,
+          enabled: false,
+        );
+    }
+  }
+}
+
+class _OrderPrimaryAction {
+  const _OrderPrimaryAction({
+    required this.label,
+    required this.icon,
+    required this.enabled,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool enabled;
+}
+
+enum _PaymentMethodOption {
+  savedCard(
+    title: 'Tarjeta guardada',
+    subtitle: 'Visa terminación 4242',
+    icon: Icons.credit_card_rounded,
+  ),
+  spei(
+    title: 'Transferencia SPEI',
+    subtitle: 'Aplicación en menos de 1 hora',
+    icon: Icons.account_balance_rounded,
+  );
+
+  const _PaymentMethodOption({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+}
+
+class _PaymentMethodTile extends StatelessWidget {
+  const _PaymentMethodTile({
+    required this.option,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final _PaymentMethodOption option;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.fieldBackground,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? AppColors.activeIcon : AppColors.outline,
+            width: isSelected ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          children: <Widget>[
+            Container(
+              height: 36,
+              width: 36,
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(option.icon, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(option.title),
+                  Text(
+                    option.subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              isSelected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_off_rounded,
+              color: isSelected ? AppColors.activeIcon : AppColors.outline,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -270,7 +804,7 @@ class _ServiceChip extends StatelessWidget {
 class _OrderTimeline extends StatelessWidget {
   const _OrderTimeline({required this.status});
 
-  final String status;
+  final ClientOrderStatus status;
 
   @override
   Widget build(BuildContext context) {
@@ -282,7 +816,14 @@ class _OrderTimeline extends StatelessWidget {
     );
   }
 
-  List<_TimelineStep> _buildSteps(String status) {
+  List<_TimelineStep> _buildSteps(ClientOrderStatus status) {
+    if (status == ClientOrderStatus.cancelled) {
+      return const <_TimelineStep>[
+        _TimelineStep(label: 'Solicitud recibida', isDone: true),
+        _TimelineStep(label: 'Orden cancelada', isDone: true),
+      ];
+    }
+
     final List<_TimelineStep> base = <_TimelineStep>[
       const _TimelineStep(label: 'Solicitud recibida'),
       const _TimelineStep(label: 'Confirmacion de disponibilidad'),
@@ -290,14 +831,7 @@ class _OrderTimeline extends StatelessWidget {
       const _TimelineStep(label: 'Evento completado'),
     ];
 
-    int completed = 1;
-    if (status.toLowerCase().contains('confirm')) {
-      completed = 2;
-    } else if (status.toLowerCase().contains('pago')) {
-      completed = 3;
-    } else if (status.toLowerCase().contains('complet')) {
-      completed = 4;
-    }
+    final int completed = status.timelineCompletedSteps;
 
     return <_TimelineStep>[
       for (int i = 0; i < base.length; i++)

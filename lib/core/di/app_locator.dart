@@ -12,22 +12,24 @@ import 'package:festum/features/auth/repositories/auth_repository.dart';
 import 'package:festum/features/client/repositories/client_cart_repository.dart';
 import 'package:festum/features/client/repositories/client_orders_repository.dart';
 import 'package:festum/features/client/repositories/client_services_repository.dart';
+import 'package:festum/features/client/repositories/api/api_client_cart_repository.dart';
+import 'package:festum/features/client/repositories/api/api_client_orders_repository.dart';
+import 'package:festum/features/client/repositories/api/api_client_services_repository.dart';
 import 'package:festum/features/client/repositories/mock/mock_client_cart_repository.dart';
 import 'package:festum/features/client/repositories/mock/mock_client_orders_repository.dart';
 import 'package:festum/features/client/repositories/mock/mock_client_services_repository.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
+import 'package:festum/features/client/usecases/add_service_to_cart_use_case.dart';
+import 'package:festum/features/client/usecases/checkout_cart_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_cart_items_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_home_sections_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_orders_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_service_by_id_use_case.dart';
 import 'package:festum/features/client/usecases/get_services_by_category_use_case.dart';
+import 'package:festum/features/client/usecases/is_service_in_cart_use_case.dart';
 import 'package:festum/features/client/usecases/remove_client_cart_item_use_case.dart';
 import 'package:festum/features/client/usecases/restore_client_cart_item_use_case.dart';
 import 'package:festum/features/client/usecases/update_client_cart_quantity_use_case.dart';
-import 'package:festum/features/provider/repositories/provider_business_repository.dart';
-import 'package:festum/features/provider/repositories/provider_home_repository.dart';
-import 'package:festum/features/provider/repositories/provider_reservations_repository.dart';
-import 'package:festum/features/provider/repositories/provider_services_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
@@ -51,16 +53,15 @@ Future<void> setupLocator() async {
     () => ProviderBusinessInfoStateService(locator<SharedPreferences>()),
   );
 
-  locator.registerLazySingleton<Dio>(
-    () {
-      final Dio dio = Dio(
-        BaseOptions(
-          baseUrl: AppEnvironment.apiBaseUrl,
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 15),
-          contentType: Headers.jsonContentType,
-        ),
-      );
+  locator.registerLazySingleton<Dio>(() {
+    final Dio dio = Dio(
+      BaseOptions(
+        baseUrl: AppEnvironment.apiBaseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        contentType: Headers.jsonContentType,
+      ),
+    );
 
     dio.interceptors.add(AuthInterceptor(locator<AuthStateService>()));
     dio.interceptors.add(SessionInterceptor(locator<AuthStateService>()));
@@ -92,15 +93,27 @@ Future<void> setupLocator() async {
   );
   locator.registerLazySingleton<ImagePicker>(ImagePicker.new);
 
-  locator.registerLazySingleton<ClientServicesRepository>(
-    MockClientServicesRepository.new,
-  );
-  locator.registerLazySingleton<ClientOrdersRepository>(
-    MockClientOrdersRepository.new,
-  );
-  locator.registerLazySingleton<ClientCartRepository>(
-    MockClientCartRepository.new,
-  );
+  if (AppEnvironment.useClientMocks) {
+    locator.registerLazySingleton<ClientServicesRepository>(
+      MockClientServicesRepository.new,
+    );
+    locator.registerLazySingleton<ClientOrdersRepository>(
+      MockClientOrdersRepository.new,
+    );
+    locator.registerLazySingleton<ClientCartRepository>(
+      MockClientCartRepository.new,
+    );
+  } else {
+    locator.registerLazySingleton<ClientServicesRepository>(
+      () => ApiClientServicesRepository(locator<ApiClient>()),
+    );
+    locator.registerLazySingleton<ClientOrdersRepository>(
+      () => ApiClientOrdersRepository(locator<ApiClient>()),
+    );
+    locator.registerLazySingleton<ClientCartRepository>(
+      () => ApiClientCartRepository(locator<ApiClient>()),
+    );
+  }
 
   locator.registerLazySingleton<GetClientHomeSectionsUseCase>(
     () => GetClientHomeSectionsUseCase(locator<ClientServicesRepository>()),
@@ -114,6 +127,9 @@ Future<void> setupLocator() async {
   locator.registerLazySingleton<GetClientOrdersUseCase>(
     () => GetClientOrdersUseCase(locator<ClientOrdersRepository>()),
   );
+  locator.registerLazySingleton<UpdateClientOrderStatusUseCase>(
+    () => UpdateClientOrderStatusUseCase(locator<ClientOrdersRepository>()),
+  );
   locator.registerLazySingleton<GetClientCartItemsUseCase>(
     () => GetClientCartItemsUseCase(locator<ClientCartRepository>()),
   );
@@ -123,8 +139,17 @@ Future<void> setupLocator() async {
   locator.registerLazySingleton<RestoreClientCartItemUseCase>(
     () => RestoreClientCartItemUseCase(locator<ClientCartRepository>()),
   );
-  locator.registerLazySingleton<UpdateClientCartQuantityUseCase>(
-    () => UpdateClientCartQuantityUseCase(locator<ClientCartRepository>()),
+  locator.registerLazySingleton<AddServiceToCartUseCase>(
+    () => AddServiceToCartUseCase(locator<ClientCartRepository>()),
+  );
+  locator.registerLazySingleton<IsServiceInCartUseCase>(
+    () => IsServiceInCartUseCase(locator<ClientCartRepository>()),
+  );
+  locator.registerLazySingleton<CheckoutCartUseCase>(
+    () => CheckoutCartUseCase(
+      locator<ClientCartRepository>(),
+      locator<ClientOrdersRepository>(),
+    ),
   );
 
   await _validateExistingSession();

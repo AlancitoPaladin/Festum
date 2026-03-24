@@ -3,12 +3,17 @@ import 'package:festum/features/client/models/client_cart_item.dart';
 abstract class ClientCartRepository {
   Future<List<ClientCartItem>> getCartItems();
 
-  Future<ClientCartItem?> removeItem(String id);
+  Future<bool> containsService(String serviceId);
 
-  Future<ClientCartItem?> updateQuantity({
-    required String id,
-    required int quantity,
+  Future<bool> addService({
+    required String serviceId,
+    required String name,
+    required int unitPriceCents,
   });
 
+  Future<ClientCartItem?> removeItem(String id);
+
   Future<void> restoreItem({required ClientCartItem item, required int index});
+
+  Future<void> clear();
 }
