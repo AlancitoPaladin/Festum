@@ -2,6 +2,7 @@ import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/models/account_role.dart';
 import 'package:festum/core/services/auth_state_service.dart';
 import 'package:festum/core/services/provider_business_info_state_service.dart';
+import 'package:festum/core/services/registration_state_service.dart';
 import 'package:festum/features/auth/views/login_view.dart';
 import 'package:festum/features/auth/views/registration_view.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
@@ -16,18 +17,17 @@ import 'package:festum/features/onboarding/views/registration_type_view.dart';
 import 'package:festum/features/provider/models/booking.dart';
 import 'package:festum/features/provider/models/service_category.dart';
 import 'package:festum/features/provider/views/add_product_view.dart';
-import 'package:festum/features/provider/views/edit_product_view.dart';
-import 'package:festum/features/provider/views/edit_service_view.dart';
 import 'package:festum/features/provider/views/availability_calendar_view.dart';
 import 'package:festum/features/provider/views/booking_detail_view.dart';
 import 'package:festum/features/provider/views/create_service_view.dart';
+import 'package:festum/features/provider/views/edit_product_view.dart';
+import 'package:festum/features/provider/views/edit_service_view.dart';
 import 'package:festum/features/provider/views/manage_service_view.dart';
-import 'package:festum/features/provider/views/my_services_view.dart';
 import 'package:festum/features/provider/views/manual_booking_view.dart';
+import 'package:festum/features/provider/views/my_services_view.dart';
 import 'package:festum/features/provider/views/provider_business_info_view.dart';
 import 'package:festum/features/provider/views/provider_home_view.dart';
 import 'package:festum/features/provider/views/reservations_view.dart';
-import 'package:festum/core/services/registration_state_service.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
@@ -182,17 +182,19 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.providerManageService,
         builder: (context, state) {
+          final serviceId = state.pathParameters['id'] ?? '';
           final serviceName = state.pathParameters['name'] ?? '';
           final categorySlug = state.pathParameters['category'] ?? '';
           final category = ServiceCategory.values.where(
             (value) => value.name == categorySlug,
           );
 
-          if (serviceName.isEmpty || category.isEmpty) {
+          if (serviceId.isEmpty || serviceName.isEmpty || category.isEmpty) {
             return const MyServicesView();
           }
 
           return ManageServiceView(
+            serviceId: serviceId,
             serviceName: serviceName,
             category: category.first,
           );
@@ -204,46 +206,61 @@ class AppRouter {
       ),
       GoRoute(
         path: AppRoutes.providerManualBooking,
-        builder: (context, state) => const ManualBookingView(),
+        builder: (context, state) {
+          final String productId = state.pathParameters['productId'] ?? '';
+          final String dateValue = state.pathParameters['date'] ?? '';
+          final DateTime? initialDate = DateTime.tryParse(dateValue);
+
+          if (productId.isEmpty) {
+            return const ReservationsView();
+          }
+
+          return ManualBookingView(
+            productId: productId,
+            initialDate: initialDate,
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.providerBookingDetail,
         builder: (context, state) {
-          final mockBooking = Booking(
-            id: '1',
-            customerName: 'Mariana López',
-            customerImageUrl: 'https://i.pravatar.cc/150?u=mariana',
-            customerPhone: '2221234567',
-            date: DateTime(2025, 8, 20),
-            time: '18:00',
-            eventType: 'Boda',
-            guests: 180,
-            totalAmount: 15000,
-            paidAmount: 5000,
-            status: 'Confirmada',
+          final booking = state.extra;
+          if (booking is! Booking) {
+            return const ReservationsView();
+          }
+          return BookingDetailView(booking: booking);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.providerEditBooking,
+        builder: (context, state) {
+          final booking = state.extra;
+          if (booking is! Booking) {
+            return const ReservationsView();
+          }
+          return ManualBookingView(
+            productId: booking.productId,
+            initialDate: booking.date,
+            initialBooking: booking,
           );
-          return BookingDetailView(booking: mockBooking);
         },
       ),
       GoRoute(
         path: AppRoutes.providerAddProduct,
         builder: (context, state) {
+          final serviceId = state.pathParameters['serviceId']!;
           final categorySlug = state.pathParameters['category']!;
           final category = ServiceCategory.values.firstWhere(
             (e) => e.name == categorySlug,
           );
-          return AddProductView(category: category);
+          return AddProductView(serviceId: serviceId, category: category);
         },
       ),
       GoRoute(
         path: AppRoutes.providerEditProduct,
         builder: (context, state) {
-          final categorySlug = state.pathParameters['category']!;
           final productId = state.pathParameters['productId']!;
-          final category = ServiceCategory.values.firstWhere(
-            (e) => e.name == categorySlug,
-          );
-          return EditProductView(category: category, productId: productId);
+          return EditProductView(productId: productId);
         },
       ),
       GoRoute(
@@ -276,9 +293,12 @@ class AppRouter {
 
     if (!isAuthenticated) {
       final bool isOnboardingRoute =
-          location == AppRoutes.registrationType || location.startsWith('/registro/');
+          location == AppRoutes.registrationType ||
+          location.startsWith('/registro/');
 
-      if (!hasCompletedRegistration && !isOnboardingRoute && location != AppRoutes.login) {
+      if (!hasCompletedRegistration &&
+          !isOnboardingRoute &&
+          location != AppRoutes.login) {
         return AppRoutes.registrationType;
       }
 
@@ -316,8 +336,10 @@ class AppRouter {
   String? _defaultRouteForRole(AccountRole? role) {
     if (role == null) return null;
     switch (role) {
-      case AccountRole.client: return AppRoutes.clientServices;
-      case AccountRole.provider: return AppRoutes.providerHome;
+      case AccountRole.client:
+        return AppRoutes.clientServices;
+      case AccountRole.provider:
+        return AppRoutes.providerHome;
     }
   }
 }

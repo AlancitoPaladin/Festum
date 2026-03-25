@@ -1,10 +1,16 @@
 import 'package:festum/core/di/app_locator.dart';
+import 'package:festum/core/services/provider_reactivity_service.dart';
 import 'package:festum/core/network/api_url_resolver.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/app_remote_image.dart';
 import 'package:festum/features/provider/models/provider_home_response.dart';
 import 'package:festum/features/provider/models/provider_notification.dart';
 import 'package:festum/features/provider/models/provider_tab.dart';
+import 'package:festum/features/provider/usecases/clear_provider_notifications_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_home_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_notifications_use_case.dart';
+import 'package:festum/features/provider/usecases/mark_all_provider_notifications_as_read_use_case.dart';
+import 'package:festum/features/provider/usecases/mark_provider_notification_as_read_use_case.dart';
 import 'package:festum/features/provider/viewmodels/provider_home_viewmodel.dart';
 import 'package:festum/features/provider/views/my_services_view.dart';
 import 'package:festum/features/provider/views/provider_profile_view.dart';
@@ -59,7 +65,14 @@ class _HomeTabBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ViewModelBuilder<ProviderHomeViewModel>.reactive(
-      viewModelBuilder: () => ProviderHomeViewModel(locator()),
+      viewModelBuilder: () => ProviderHomeViewModel(
+        locator<GetProviderHomeUseCase>(),
+        locator<GetProviderNotificationsUseCase>(),
+        locator<MarkProviderNotificationAsReadUseCase>(),
+        locator<MarkAllProviderNotificationsAsReadUseCase>(),
+        locator<ClearProviderNotificationsUseCase>(),
+        locator<ProviderReactivityService>(),
+      ),
       onViewModelReady: (ProviderHomeViewModel model) => model.initialize(),
       builder: (context, model, child) {
         if (model.isBusy && !model.hasContent) {

@@ -1,22 +1,38 @@
 import 'package:dio/dio.dart';
+import 'package:festum/core/services/provider_branding_service.dart';
 import 'package:festum/core/services/provider_business_info_state_service.dart';
+import 'package:festum/core/services/provider_reactivity_service.dart';
 import 'package:festum/features/provider/models/business_info.dart';
 import 'package:festum/features/provider/models/provider_asset_upload_response.dart';
 import 'package:festum/features/provider/models/provider_business_profile.dart';
 import 'package:festum/features/provider/repositories/provider_business_repository.dart';
+import 'package:festum/features/provider/usecases/get_provider_business_profile_use_case.dart';
+import 'package:festum/features/provider/usecases/save_provider_business_profile_use_case.dart';
+import 'package:festum/features/provider/usecases/upload_provider_business_logo_use_case.dart';
+import 'package:festum/features/provider/usecases/upload_provider_business_photo_use_case.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:stacked/stacked.dart';
 
 class ProviderBusinessInfoViewModel extends BaseViewModel {
   ProviderBusinessInfoViewModel(
-    this._providerBusinessRepository,
+    this._getProviderBusinessProfileUseCase,
+    this._saveProviderBusinessProfileUseCase,
+    this._uploadProviderBusinessLogoUseCase,
+    this._uploadProviderBusinessPhotoUseCase,
     this._providerBusinessInfoStateService,
+    this._providerBrandingService,
+    this._providerReactivityService,
     this._imagePicker,
   );
 
-  final ProviderBusinessRepository _providerBusinessRepository;
+  final GetProviderBusinessProfileUseCase _getProviderBusinessProfileUseCase;
+  final SaveProviderBusinessProfileUseCase _saveProviderBusinessProfileUseCase;
+  final UploadProviderBusinessLogoUseCase _uploadProviderBusinessLogoUseCase;
+  final UploadProviderBusinessPhotoUseCase _uploadProviderBusinessPhotoUseCase;
   final ProviderBusinessInfoStateService _providerBusinessInfoStateService;
+  final ProviderBrandingService _providerBrandingService;
+  final ProviderReactivityService _providerReactivityService;
   final ImagePicker _imagePicker;
 
   final TextEditingController businessNameController = TextEditingController();
@@ -53,9 +69,13 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
     _errorMessage = null;
 
     try {
-      final ProviderBusinessProfile profile = await _providerBusinessRepository
-          .fetchProfile();
+      final ProviderBusinessProfile profile =
+          await _getProviderBusinessProfileUseCase();
       _applyProfile(profile);
+      await _providerBrandingService.sync(
+        businessName: profile.businessName,
+        logoUrl: profile.logoUrl,
+      );
       _didRefreshAfterAsset403 = false;
       _hasLoadedProfile = true;
 
@@ -69,6 +89,7 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
         _hasExistingProfile = false;
         _errorMessage = null;
         await _providerBusinessInfoStateService.resetBusinessInfoProgress();
+        await _providerBrandingService.clear();
       } else {
         _errorMessage = ProviderBusinessRepository.mapApiError(error);
       }
@@ -121,9 +142,14 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
   Future<String?> saveProfile() async {
     setBusy(true);
     try {
-      final ProviderBusinessProfile response = await _providerBusinessRepository
-          .saveProfile(_toProfile());
+      final ProviderBusinessProfile response =
+          await _saveProviderBusinessProfileUseCase(_toProfile());
       _applyProfile(response);
+      await _providerBrandingService.sync(
+        businessName: response.businessName,
+        logoUrl: response.logoUrl,
+      );
+      await _providerReactivityService.notifyBusinessChanged();
       _hasExistingProfile = true;
       await _providerBusinessInfoStateService.completeBusinessInfo();
       return null;
@@ -139,7 +165,7 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
     return _uploadAsset(
       pickerAction: () =>
           _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 85),
-      uploadAction: _providerBusinessRepository.uploadLogo,
+      uploadAction: _uploadProviderBusinessLogoUseCase.call,
       onUploaded: (String assetUrl) {
         _businessInfo.logoUrl = assetUrl;
       },
@@ -150,7 +176,7 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
     return _uploadAsset(
       pickerAction: () =>
           _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 85),
-      uploadAction: _providerBusinessRepository.uploadPhoto,
+      uploadAction: _uploadProviderBusinessPhotoUseCase.call,
       onUploaded: (String assetUrl) {
         _businessInfo.photoUrls = List<String>.from(_businessInfo.photoUrls)
           ..add(assetUrl);
@@ -212,6 +238,11 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
       }
 
       onUploaded(assetUrl);
+      await _providerBrandingService.sync(
+        businessName: _businessInfo.name,
+        logoUrl: _businessInfo.logoUrl ?? '',
+      );
+      await _providerReactivityService.notifyBusinessChanged();
       return null;
     } catch (error) {
       return ProviderBusinessRepository.mapApiError(error);

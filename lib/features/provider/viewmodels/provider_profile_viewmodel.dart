@@ -1,15 +1,21 @@
 import 'package:festum/core/services/auth_state_service.dart';
+import 'package:festum/core/services/provider_branding_service.dart';
 import 'package:festum/core/services/provider_business_info_state_service.dart';
+import 'package:festum/core/services/provider_reactivity_service.dart';
 import 'package:stacked/stacked.dart';
 
 class ProviderProfileViewModel extends BaseViewModel {
   ProviderProfileViewModel(
     this._authStateService,
     this._providerBusinessInfoStateService,
+    this._providerBrandingService,
+    this._providerReactivityService,
   );
 
   final AuthStateService _authStateService;
   final ProviderBusinessInfoStateService _providerBusinessInfoStateService;
+  final ProviderBrandingService _providerBrandingService;
+  final ProviderReactivityService _providerReactivityService;
 
   String get userName => 'Jair';
   String get userEmail => 'jair.provider@festum.com';
@@ -25,6 +31,8 @@ class ProviderProfileViewModel extends BaseViewModel {
 
   Future<void> logout() async {
     await _providerBusinessInfoStateService.resetBusinessInfoProgress();
+    await _providerBrandingService.clear();
+    await _providerReactivityService.clear();
     await _authStateService.signOut();
   }
 }

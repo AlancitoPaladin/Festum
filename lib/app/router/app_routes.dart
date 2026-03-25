@@ -18,17 +18,19 @@ class AppRoutes {
   static const String providerBusinessInfo = '/provider/business-info';
   static const String providerMyServices = '/provider/my-services';
   static const String providerManageService =
-      '/provider/manage-service/:name/:category';
+      '/provider/manage-service/:id/:name/:category';
   static const String providerCreateService = '/provider/create-service';
   static const String providerEditService =
       '/provider/edit-service/:id/:name/:category';
-  static const String providerAddProduct = '/provider/add-product/:category';
-  static const String providerEditProduct =
-      '/provider/edit-product/:category/:productId';
+  static const String providerAddProduct =
+      '/provider/add-product/:serviceId/:category';
+  static const String providerEditProduct = '/provider/edit-product/:productId';
   static const String providerReservations = '/provider/reservations';
   static const String providerAvailability = '/provider/availability/:id/:name';
   static const String providerBookingDetail = '/provider/booking-detail/:date';
-  static const String providerManualBooking = '/provider/manual-booking/:date';
+  static const String providerManualBooking =
+      '/provider/manual-booking/:productId/:date';
+  static const String providerEditBooking = '/provider/edit-booking/:bookingId';
 
   static String clientServicesCategory(String category) =>
       '/client/services/$category';
@@ -51,8 +53,11 @@ class AppRoutes {
     return '/client/checkout-success/$orderId?$query';
   }
 
-  static String providerManageServiceRoute(String name, String category) =>
-      '/provider/manage-service/${Uri.encodeComponent(name)}/$category';
+  static String providerManageServiceRoute(
+    String id,
+    String name,
+    String category,
+  ) => '/provider/manage-service/$id/${Uri.encodeComponent(name)}/$category';
 
   static String providerEditServiceRoute(
     String id,
@@ -60,11 +65,11 @@ class AppRoutes {
     String category,
   ) => '/provider/edit-service/$id/${Uri.encodeComponent(name)}/$category';
 
-  static String providerAddProductRoute(String category) =>
-      '/provider/add-product/$category';
+  static String providerAddProductRoute(String serviceId, String category) =>
+      '/provider/add-product/$serviceId/$category';
 
-  static String providerEditProductRoute(String category, String productId) =>
-      '/provider/edit-product/$category/$productId';
+  static String providerEditProductRoute(String productId) =>
+      '/provider/edit-product/$productId';
 
   static String providerAvailabilityRoute(String id, String name) =>
       '/provider/availability/$id/${Uri.encodeComponent(name)}';
@@ -72,6 +77,9 @@ class AppRoutes {
   static String providerBookingDetailRoute(String date) =>
       '/provider/booking-detail/$date';
 
-  static String providerManualBookingRoute(String date) =>
-      '/provider/manual-booking/$date';
+  static String providerManualBookingRoute(String productId, String date) =>
+      '/provider/manual-booking/$productId/$date';
+
+  static String providerEditBookingRoute(String bookingId) =>
+      '/provider/edit-booking/$bookingId';
 }

@@ -192,7 +192,10 @@ class AvailabilityCalendarView extends StatelessWidget {
                 textColor: Colors.white, 
                 onPressed: () {
                   Navigator.pop(context);
-                  context.push(AppRoutes.providerBookingDetailRoute(dateStr));
+                  context.push(
+                    AppRoutes.providerBookingDetailRoute(dateStr),
+                    extra: booking,
+                  );
                 }
               ),
               const SizedBox(height: 12),
@@ -206,7 +209,9 @@ class AvailabilityCalendarView extends StatelessWidget {
                 textColor: Colors.white, 
                 onPressed: () {
                   Navigator.pop(context);
-                  context.push(AppRoutes.providerManualBookingRoute(dateStr));
+                  context.push(
+                    AppRoutes.providerManualBookingRoute(productId, dateStr),
+                  );
                 }
               ),
               const SizedBox(height: 12),

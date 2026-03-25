@@ -161,10 +161,12 @@ class RegistrationView extends StackedView<RegistrationViewModel> {
   @override
   RegistrationViewModel viewModelBuilder(BuildContext context) =>
       RegistrationViewModel(
-        role,
-        locator(),
-        locator(),
-        locator(),
-        locator(),
-      );
+          role,
+          locator(),
+          locator(),
+          locator(),
+          locator(),
+          locator(),
+          locator(),
+        );
 }

@@ -7,7 +7,7 @@ class ProviderReservationsRepository {
 
   final ApiClient _apiClient;
 
-  Future<List<ProductReservationSummary>> fetchProducts() async {
+  Future<List<ProductReservationSummary>> fetchReservationsProducts() async {
     final Map<String, dynamic> response =
         await _apiClient.getProviderProductReservations();
     return ProductReservationsResponse.fromJson(response).items;

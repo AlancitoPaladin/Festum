@@ -186,6 +186,11 @@ class _ClientHomeViewState extends State<ClientHomeView> {
   }
 
   Widget _buildBody() {
+    final List<ClientServiceCategory> visibleCategories =
+        ClientServiceCategory.values.where((ClientServiceCategory category) {
+          return (_sections[category] ?? const <ClientServiceItem>[]).isNotEmpty;
+        }).toList();
+
     if (_isLoading) {
       return const ClientStatusView.loading(
         title: 'Cargando inicio',
@@ -200,7 +205,7 @@ class _ClientHomeViewState extends State<ClientHomeView> {
       );
     }
 
-    if (_sections.isEmpty) {
+    if (visibleCategories.isEmpty) {
       return ClientStatusView.empty(
         title: 'No hay servicios por mostrar',
         message: 'Vuelve más tarde para consultar las categorías.',
@@ -214,7 +219,7 @@ class _ClientHomeViewState extends State<ClientHomeView> {
       controller: _scrollController,
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 120),
-      children: ClientServiceCategory.values
+      children: visibleCategories
           .map(
             (ClientServiceCategory category) => Padding(
               padding: const EdgeInsets.only(bottom: 16),

@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:festum/core/models/account_role.dart';
 import 'package:festum/core/services/auth_state_service.dart';
+import 'package:festum/core/services/provider_branding_service.dart';
 import 'package:festum/core/services/provider_business_info_state_service.dart';
+import 'package:festum/core/services/provider_reactivity_service.dart';
 import 'package:festum/features/auth/repositories/auth_repository.dart';
 import 'package:festum/features/provider/models/provider_business_profile.dart';
 import 'package:festum/features/provider/repositories/provider_business_repository.dart';
@@ -14,12 +16,16 @@ class LoginViewModel extends BaseViewModel {
     this._authStateService,
     this._providerBusinessInfoStateService,
     this._providerBusinessRepository,
+    this._providerBrandingService,
+    this._providerReactivityService,
   );
 
   final AuthRepository _authRepository;
   final AuthStateService _authStateService;
   final ProviderBusinessInfoStateService _providerBusinessInfoStateService;
   final ProviderBusinessRepository _providerBusinessRepository;
+  final ProviderBrandingService _providerBrandingService;
+  final ProviderReactivityService _providerReactivityService;
 
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   final TextEditingController emailController = TextEditingController();
@@ -41,6 +47,8 @@ class LoginViewModel extends BaseViewModel {
       );
 
       await _providerBusinessInfoStateService.resetBusinessInfoProgress();
+      await _providerBrandingService.clear();
+      await _providerReactivityService.clear();
       await _authStateService.signIn(
         accessToken: session.accessToken,
         role: session.role,
@@ -81,9 +89,14 @@ class LoginViewModel extends BaseViewModel {
       await _providerBusinessInfoStateService.syncBusinessInfoProgress(
         hasCompletedBusinessInfo,
       );
+      await _providerBrandingService.sync(
+        businessName: profile.businessName,
+        logoUrl: profile.logoUrl,
+      );
     } on DioException catch (error) {
       if (error.response?.statusCode == 404) {
         await _providerBusinessInfoStateService.resetBusinessInfoProgress();
+        await _providerBrandingService.clear();
       }
     }
   }

@@ -1,8 +1,11 @@
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/network/api_url_resolver.dart';
+import 'package:festum/core/services/provider_reactivity_service.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/custom_app_bar.dart';
 import 'package:festum/features/provider/models/product_reservations_response.dart';
+import 'package:festum/features/provider/usecases/delete_provider_product_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_product_reservations_use_case.dart';
 import 'package:festum/features/provider/viewmodels/reservations_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
@@ -13,7 +16,11 @@ class ReservationsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ViewModelBuilder<ReservationsViewModel>.reactive(
-      viewModelBuilder: () => ReservationsViewModel(locator()),
+      viewModelBuilder: () => ReservationsViewModel(
+        locator<GetProviderProductReservationsUseCase>(),
+        locator<DeleteProviderProductUseCase>(),
+        locator<ProviderReactivityService>(),
+      ),
       onViewModelReady: (ReservationsViewModel model) => model.initialise(),
       builder: (context, model, child) => Scaffold(
         backgroundColor: AppColors.background,
@@ -61,11 +68,7 @@ class ReservationsView extends StatelessWidget {
                 return _ProductReservationCard(
                   product: product,
                   onDelete: () => _deleteProduct(context, model, product.id),
-                  onEdit: () => model.editProduct(
-                    context,
-                    product.id,
-                    product.category,
-                  ),
+                  onEdit: () => model.editProduct(context, product.id),
                   onManage: () => model.manageAvailability(
                     context,
                     product.id,

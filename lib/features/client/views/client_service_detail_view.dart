@@ -203,6 +203,10 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
             _QuickFacts(category: widget.category),
             const SizedBox(height: 16),
             _AvailabilityCard(),
+            if (service.products.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 16),
+              _ProductOptionsSection(products: service.products),
+            ],
             const SizedBox(height: 16),
             _InfoSection(
               title: 'Descripcion general',
@@ -435,6 +439,112 @@ class _QuickFacts extends StatelessWidget {
         _FactChip(icon: Icons.group_rounded, label: 'Hasta 350 invitados'),
         _FactChip(icon: category.icon, label: category.title),
       ],
+    );
+  }
+}
+
+class _ProductOptionsSection extends StatelessWidget {
+  const _ProductOptionsSection({required this.products});
+
+  final List<ClientServiceProduct> products;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Productos disponibles',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Estos productos ya estan publicados por el proveedor.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 14),
+            ...products.map(
+              (ClientServiceProduct product) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _ProductOptionCard(product: product),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductOptionCard extends StatelessWidget {
+  const _ProductOptionCard({required this.product});
+
+  final ClientServiceProduct product;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.fieldBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: <Widget>[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 72,
+              height: 72,
+              child: AppRemoteImage(
+                imageUrl: product.imageUrl,
+                fit: BoxFit.cover,
+                placeholder: Container(
+                  color: AppColors.cardAccent,
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.image_outlined,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  product.name,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  product.description.trim().isEmpty
+                      ? 'Sin descripcion disponible.'
+                      : product.description,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  product.priceLabel,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.activeIcon,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

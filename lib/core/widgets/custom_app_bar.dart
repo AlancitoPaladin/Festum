@@ -1,4 +1,7 @@
+import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/theme/app_colors.dart';
+import 'package:festum/core/widgets/app_remote_image.dart';
+import 'package:festum/core/services/provider_branding_service.dart';
 import 'package:flutter/material.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -31,18 +34,59 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           fontSize: 20,
         ),
       ),
-      actions: actions ?? [
-        const Padding(
-          padding: EdgeInsets.only(right: 16.0),
-          child: CircleAvatar(
-            backgroundImage: NetworkImage('https://i.pravatar.cc/150?u=jair'),
-            radius: 18,
-          ),
-        ),
-      ],
+      actions: actions ?? const <Widget>[_ProviderAppBarAvatar()],
     );
   }
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+}
+
+class _ProviderAppBarAvatar extends StatelessWidget {
+  const _ProviderAppBarAvatar();
+
+  @override
+  Widget build(BuildContext context) {
+    final ProviderBrandingService brandingService =
+        locator<ProviderBrandingService>();
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: ListenableBuilder(
+        listenable: brandingService,
+        builder: (BuildContext context, Widget? child) {
+          final String imageUrl = brandingService.logoUrl;
+          return CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.backgroundElevated,
+            child: imageUrl.trim().isEmpty
+                ? const Icon(
+                    Icons.storefront_outlined,
+                    size: 18,
+                    color: AppColors.secondaryText,
+                  )
+                : ClipOval(
+                    child: AppRemoteImage(
+                      imageUrl: imageUrl,
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.cover,
+                      placeholder: Container(
+                        width: 36,
+                        height: 36,
+                        color: AppColors.backgroundElevated,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.storefront_outlined,
+                          size: 18,
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
+                    ),
+                  ),
+          );
+        },
+      ),
+    );
+  }
 }

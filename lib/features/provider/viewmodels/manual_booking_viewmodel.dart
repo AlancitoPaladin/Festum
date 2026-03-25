@@ -1,51 +1,254 @@
-import 'package:stacked/stacked.dart';
+import 'package:festum/core/services/provider_reactivity_service.dart';
+import 'package:festum/features/provider/models/booking.dart';
+import 'package:festum/features/provider/models/manual_booking_request.dart';
+import 'package:festum/features/provider/models/update_booking_request.dart';
+import 'package:festum/features/provider/repositories/provider_bookings_repository.dart';
+import 'package:festum/features/provider/usecases/create_manual_booking_use_case.dart';
+import 'package:festum/features/provider/usecases/update_provider_booking_use_case.dart';
 import 'package:flutter/material.dart';
+import 'package:stacked/stacked.dart';
 
 class ManualBookingViewModel extends BaseViewModel {
-  String customerName = '';
+  ManualBookingViewModel({
+    required this.productId,
+    required CreateManualBookingUseCase createManualBookingUseCase,
+    required UpdateProviderBookingUseCase updateProviderBookingUseCase,
+    required ProviderReactivityService providerReactivityService,
+    DateTime? initialDate,
+    Booking? initialBooking,
+  }) : _createManualBookingUseCase = createManualBookingUseCase,
+       _updateProviderBookingUseCase = updateProviderBookingUseCase,
+       _providerReactivityService = providerReactivityService,
+       _initialBooking = initialBooking,
+       selectedDate = initialBooking?.date ?? initialDate {
+    customerNameController.text = initialBooking?.customerName ?? '';
+    eventTypeController.text = initialBooking?.eventType ?? '';
+    guestsController.text = initialBooking == null || initialBooking.guests == 0
+        ? ''
+        : initialBooking.guests.toString();
+    contactPhoneController.text = initialBooking?.customerPhone ?? '';
+    contactEmailController.text = initialBooking?.contactEmail ?? '';
+    eventLocationController.text = initialBooking?.eventLocation ?? '';
+    paymentDetailsController.text = initialBooking?.paymentDetails ?? '';
+    notesController.text = initialBooking?.notes ?? '';
+    hasSpecificSchedule = _hasSchedule(initialBooking);
+    startTime = _readStartTime(initialBooking?.time);
+    endTime = _readEndTime(initialBooking?.time);
+  }
+
+  final String productId;
+  final CreateManualBookingUseCase _createManualBookingUseCase;
+  final UpdateProviderBookingUseCase _updateProviderBookingUseCase;
+  final ProviderReactivityService _providerReactivityService;
+  final Booking? _initialBooking;
+
+  final TextEditingController customerNameController = TextEditingController();
+  final TextEditingController eventTypeController = TextEditingController();
+  final TextEditingController guestsController = TextEditingController();
+  final TextEditingController contactPhoneController = TextEditingController();
+  final TextEditingController contactEmailController = TextEditingController();
+  final TextEditingController eventLocationController = TextEditingController();
+  final TextEditingController paymentDetailsController =
+      TextEditingController();
+  final TextEditingController notesController = TextEditingController();
+
   DateTime? selectedDate;
   bool hasSpecificSchedule = false;
   TimeOfDay? startTime;
   TimeOfDay? endTime;
-  String eventType = '';
-  int guests = 0;
-  String contactPhone = '';
-  String contactEmail = '';
-  String eventLocation = '';
-  String paymentDetails = '';
-  String notes = '';
+  String? errorMessage;
+
+  bool get isEditMode => _initialBooking != null;
+
+  String get screenTitle => isEditMode ? 'Modificar reserva' : 'Reserva manual';
+
+  String get actionLabel =>
+      isEditMode ? 'Guardar cambios' : 'Confirmar reserva';
+
+  String get introText => isEditMode
+      ? 'Actualiza la informacion de la reserva sin cambiar la experiencia visual del flujo actual.'
+      : 'Registra una reserva externa para bloquear la fecha en tu calendario.';
 
   void setDate(DateTime date) {
     selectedDate = date;
+    _clearError();
     notifyListeners();
   }
 
   void toggleSpecificSchedule(bool value) {
     hasSpecificSchedule = value;
-
     if (!value) {
       startTime = null;
       endTime = null;
     }
+    _clearError();
     notifyListeners();
   }
 
   void setStartTime(TimeOfDay time) {
     startTime = time;
+    _clearError();
     notifyListeners();
   }
 
   void setEndTime(TimeOfDay time) {
     endTime = time;
+    _clearError();
     notifyListeners();
   }
 
-  void saveBooking() {
+  Future<Booking?> saveBooking() async {
+    final String? validationError = _validate();
+    if (validationError != null) {
+      errorMessage = validationError;
+      notifyListeners();
+      return null;
+    }
+
     setBusy(true);
-    // Simular guardado
-    Future.delayed(const Duration(seconds: 1), () {
+    errorMessage = null;
+    try {
+      final Booking booking = isEditMode
+          ? await _updateProviderBookingUseCase(
+              _initialBooking!.id,
+              UpdateBookingRequest(
+                customerName: customerNameController.text,
+                eventDate: selectedDate,
+                hasSpecificSchedule: hasSpecificSchedule,
+                startTime: hasSpecificSchedule ? _formatTime(startTime) : null,
+                endTime: hasSpecificSchedule ? _formatTime(endTime) : null,
+                eventType: eventTypeController.text,
+                guests: _parsedGuests,
+                contactPhone: contactPhoneController.text,
+                contactEmail: contactEmailController.text,
+                eventLocation: eventLocationController.text,
+                paymentDetails: paymentDetailsController.text,
+                totalAmount: _initialBooking!.totalAmount,
+                paidAmount: _initialBooking!.paidAmount,
+                notes: notesController.text,
+              ),
+            )
+          : await _createManualBookingUseCase(
+              productId: productId,
+              request: ManualBookingRequest(
+                customerName: customerNameController.text,
+                customerImageUrl: '',
+                eventDate: selectedDate!,
+                hasSpecificSchedule: hasSpecificSchedule,
+                startTime: startTime,
+                endTime: endTime,
+                eventType: eventTypeController.text,
+                guests: _parsedGuests,
+                contactPhone: contactPhoneController.text,
+                contactEmail: contactEmailController.text,
+                eventLocation: eventLocationController.text,
+                paymentDetails: paymentDetailsController.text,
+                totalAmount: 0,
+                paidAmount: 0,
+                notes: notesController.text,
+              ),
+            );
+
+      await _providerReactivityService.notifyProductsChanged();
+      return booking;
+    } catch (error) {
+      errorMessage = ProviderBookingsRepository.mapApiError(
+        error,
+        fallbackMessage: isEditMode
+            ? 'No se pudo actualizar la reserva.'
+            : 'No se pudo crear la reserva manual.',
+      );
+      notifyListeners();
+      return null;
+    } finally {
       setBusy(false);
-      // Navegar de regreso
-    });
+    }
   }
+
+  String? _validate() {
+    if (customerNameController.text.trim().isEmpty) {
+      return 'Ingresa el nombre del cliente.';
+    }
+    if (selectedDate == null) {
+      return 'Selecciona una fecha.';
+    }
+    if (eventTypeController.text.trim().isEmpty) {
+      return 'Ingresa el tipo de evento.';
+    }
+    if (hasSpecificSchedule) {
+      if (startTime == null || endTime == null) {
+        return 'Selecciona hora de inicio y fin.';
+      }
+      final int startMinutes = startTime!.hour * 60 + startTime!.minute;
+      final int endMinutes = endTime!.hour * 60 + endTime!.minute;
+      if (endMinutes <= startMinutes) {
+        return 'La hora de fin debe ser mayor que la de inicio.';
+      }
+    }
+    return null;
+  }
+
+  int get _parsedGuests => int.tryParse(guestsController.text.trim()) ?? 0;
+
+  String _formatTime(TimeOfDay? time) {
+    if (time == null) {
+      return '';
+    }
+    final String hour = time.hour.toString().padLeft(2, '0');
+    final String minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute:00';
+  }
+
+  void _clearError() {
+    if (errorMessage != null) {
+      errorMessage = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    customerNameController.dispose();
+    eventTypeController.dispose();
+    guestsController.dispose();
+    contactPhoneController.dispose();
+    contactEmailController.dispose();
+    eventLocationController.dispose();
+    paymentDetailsController.dispose();
+    notesController.dispose();
+    super.dispose();
+  }
+}
+
+bool _hasSchedule(Booking? booking) {
+  if (booking == null) {
+    return false;
+  }
+  return booking.time.contains('-');
+}
+
+TimeOfDay? _readStartTime(String? label) {
+  if (label == null || !label.contains('-')) {
+    return null;
+  }
+  return _parseTime(label.split('-').first.trim());
+}
+
+TimeOfDay? _readEndTime(String? label) {
+  if (label == null || !label.contains('-')) {
+    return null;
+  }
+  return _parseTime(label.split('-').last.trim());
+}
+
+TimeOfDay? _parseTime(String value) {
+  final List<String> parts = value.split(':');
+  if (parts.length < 2) {
+    return null;
+  }
+  final int? hour = int.tryParse(parts[0].trim());
+  final int? minute = int.tryParse(parts[1].trim());
+  if (hour == null || minute == null) {
+    return null;
+  }
+  return TimeOfDay(hour: hour, minute: minute);
 }

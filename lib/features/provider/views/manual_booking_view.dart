@@ -1,20 +1,43 @@
+import 'package:festum/core/di/app_locator.dart';
+import 'package:festum/core/services/provider_reactivity_service.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/custom_app_bar.dart';
+import 'package:festum/features/provider/models/booking.dart';
+import 'package:festum/features/provider/usecases/create_manual_booking_use_case.dart';
+import 'package:festum/features/provider/usecases/update_provider_booking_use_case.dart';
+import 'package:festum/features/provider/utils/provider_field_input.dart';
 import 'package:festum/features/provider/viewmodels/manual_booking_viewmodel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:stacked/stacked.dart';
 
 class ManualBookingView extends StatelessWidget {
-  const ManualBookingView({super.key});
+  const ManualBookingView({
+    super.key,
+    required this.productId,
+    this.initialDate,
+    this.initialBooking,
+  });
+
+  final String productId;
+  final DateTime? initialDate;
+  final Booking? initialBooking;
 
   @override
   Widget build(BuildContext context) {
     return ViewModelBuilder<ManualBookingViewModel>.reactive(
-      viewModelBuilder: () => ManualBookingViewModel(),
+      viewModelBuilder: () => ManualBookingViewModel(
+        productId: productId,
+        createManualBookingUseCase: locator<CreateManualBookingUseCase>(),
+        updateProviderBookingUseCase: locator<UpdateProviderBookingUseCase>(),
+        providerReactivityService: locator<ProviderReactivityService>(),
+        initialDate: initialDate,
+        initialBooking: initialBooking,
+      ),
       builder: (context, model, child) => Scaffold(
         backgroundColor: AppColors.background,
-        appBar: const CustomAppBar(
-          title: 'Reserva manual',
+        appBar: CustomAppBar(
+          title: model.screenTitle,
           showBackButton: true,
         ),
         body: SingleChildScrollView(
@@ -22,20 +45,24 @@ class ManualBookingView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Registra una reserva externa para bloquear la fecha en tu calendario.',
-                style: TextStyle(color: AppColors.secondaryText, fontSize: 14),
+              Text(
+                model.introText,
+                style: const TextStyle(
+                  color: AppColors.secondaryText,
+                  fontSize: 14,
+                ),
               ),
               const SizedBox(height: 32),
               _buildSectionCard(
                 title: 'Datos principales',
                 subtitle:
-                    'Llena lo esencial y usa el horario solo si necesitas apartar una franja específica.',
+                    'Llena lo esencial y usa el horario solo si necesitas apartar una franja especifica.',
                 children: [
                   _buildField(
-                    'Nombre del cliente',
-                    'Ej: Juan Pérez',
-                    (v) => model.customerName = v,
+                    label: 'Nombre del cliente',
+                    hint: 'Ej: Juan Perez',
+                    controller: model.customerNameController,
+                    inputKind: ProviderFieldInputKind.title,
                   ),
                   const SizedBox(height: 16),
                   _buildPickerField(
@@ -53,14 +80,16 @@ class ManualBookingView extends StatelessWidget {
                         firstDate: now,
                         lastDate: now.add(const Duration(days: 365)),
                       );
-                      if (date != null) model.setDate(date);
+                      if (date != null) {
+                        model.setDate(date);
+                      }
                     },
                   ),
                   const SizedBox(height: 16),
                   _buildSwitchTile(
-                    title: 'Agregar horario específico',
+                    title: 'Agregar horario especifico',
                     subtitle:
-                        'Si lo dejas apagado, la reserva queda como recordatorio o bloqueo general del día.',
+                        'Si lo dejas apagado, la reserva queda como recordatorio o bloqueo general del dia.',
                     value: model.hasSpecificSchedule,
                     onChanged: model.toggleSpecificSchedule,
                   ),
@@ -81,7 +110,9 @@ class ManualBookingView extends StatelessWidget {
                                 context: context,
                                 initialTime: model.startTime ?? TimeOfDay.now(),
                               );
-                              if (time != null) model.setStartTime(time);
+                              if (time != null) {
+                                model.setStartTime(time);
+                              }
                             },
                           ),
                         ),
@@ -102,7 +133,9 @@ class ManualBookingView extends StatelessWidget {
                                     model.startTime ??
                                     TimeOfDay.now(),
                               );
-                              if (time != null) model.setEndTime(time);
+                              if (time != null) {
+                                model.setEndTime(time);
+                              }
                             },
                           ),
                         ),
@@ -111,16 +144,17 @@ class ManualBookingView extends StatelessWidget {
                   ],
                   const SizedBox(height: 16),
                   _buildField(
-                    'Tipo de evento',
-                    'Ej: Boda, XV años...',
-                    (v) => model.eventType = v,
+                    label: 'Tipo de evento',
+                    hint: 'Ej: Boda, XV anos...',
+                    controller: model.eventTypeController,
+                    inputKind: ProviderFieldInputKind.title,
                   ),
                   const SizedBox(height: 16),
                   _buildField(
-                    'Cantidad de personas',
-                    '0',
-                    (v) => model.guests = int.tryParse(v) ?? 0,
-                    keyboardType: TextInputType.number,
+                    label: 'Cantidad de personas',
+                    hint: '0',
+                    controller: model.guestsController,
+                    inputKind: ProviderFieldInputKind.integer,
                   ),
                 ],
               ),
@@ -128,40 +162,45 @@ class ManualBookingView extends StatelessWidget {
               _buildSectionCard(
                 title: 'Detalles opcionales',
                 subtitle:
-                    'Sirven como recordatorio rápido para que no se te escape información importante.',
+                    'Sirven como recordatorio rapido para que no se te escape informacion importante.',
                 children: [
                   _buildField(
-                    'Teléfono / WhatsApp',
-                    'Ej: 55 1234 5678',
-                    (v) => model.contactPhone = v,
-                    keyboardType: TextInputType.phone,
+                    label: 'Telefono / WhatsApp',
+                    hint: 'Ej: 55 1234 5678',
+                    controller: model.contactPhoneController,
+                    inputKind: ProviderFieldInputKind.phone,
                   ),
                   const SizedBox(height: 16),
                   _buildField(
-                    'Correo',
-                    'cliente@correo.com',
-                    (v) => model.contactEmail = v,
-                    keyboardType: TextInputType.emailAddress,
+                    label: 'Correo',
+                    hint: 'cliente@correo.com',
+                    controller: model.contactEmailController,
+                    inputKind: ProviderFieldInputKind.mixedText,
                   ),
                   const SizedBox(height: 16),
                   _buildField(
-                    'Ubicación',
-                    'Ej: Jardín Las Palmas, Monterrey',
-                    (v) => model.eventLocation = v,
+                    label: 'Ubicacion',
+                    hint: 'Ej: Jardin Las Palmas, Monterrey',
+                    controller: model.eventLocationController,
+                    inputKind: ProviderFieldInputKind.mixedText,
                   ),
                   const SizedBox(height: 16),
                   _buildField(
-                    'Pago / anticipo',
-                    'Ej: Anticipo de \$2,000 recibido, resto pendiente',
-                    (v) => model.paymentDetails = v,
+                    label: 'Pago / anticipo',
+                    hint:
+                        'Ej: Anticipo de \$2,000 recibido, resto pendiente',
+                    controller: model.paymentDetailsController,
                     maxLines: 2,
+                    inputKind: ProviderFieldInputKind.mixedText,
                   ),
                   const SizedBox(height: 16),
                   _buildField(
-                    'Notas / detalles extra',
-                    'Describe acuerdos especiales, dudas o cosas por confirmar...',
-                    (v) => model.notes = v,
+                    label: 'Notas / detalles extra',
+                    hint:
+                        'Describe acuerdos especiales, dudas o cosas por confirmar...',
+                    controller: model.notesController,
                     maxLines: 3,
+                    inputKind: ProviderFieldInputKind.mixedText,
                   ),
                 ],
               ),
@@ -170,7 +209,9 @@ class ManualBookingView extends StatelessWidget {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: model.isBusy ? null : model.saveBooking,
+                  onPressed: model.isBusy
+                      ? null
+                      : () => _saveBooking(context, model),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.appBar,
                     shape: RoundedRectangleBorder(
@@ -180,9 +221,9 @@ class ManualBookingView extends StatelessWidget {
                   ),
                   child: model.isBusy
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'Confirmar reserva',
-                          style: TextStyle(
+                      : Text(
+                          model.actionLabel,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -195,6 +236,38 @@ class ManualBookingView extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _saveBooking(
+    BuildContext context,
+    ManualBookingViewModel model,
+  ) async {
+    final Booking? booking = await model.saveBooking();
+    if (!context.mounted) {
+      return;
+    }
+
+    if (booking == null) {
+      final String message = model.errorMessage ??
+          (model.isEditMode
+              ? 'No se pudo actualizar la reserva.'
+              : 'No se pudo crear la reserva manual.');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          model.isEditMode
+              ? 'Reserva actualizada.'
+              : 'Reserva manual creada.',
+        ),
+      ),
+    );
+    Navigator.pop(context, true);
   }
 
   String _formatDate(DateTime date) {
@@ -241,12 +314,12 @@ class ManualBookingView extends StatelessWidget {
     );
   }
 
-  Widget _buildField(
-    String label,
-    String hint,
-    Function(String) onChanged, {
+  Widget _buildField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
     int maxLines = 1,
-    TextInputType? keyboardType,
+    ProviderFieldInputKind inputKind = ProviderFieldInputKind.text,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,9 +341,15 @@ class ManualBookingView extends StatelessWidget {
             border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
           ),
           child: TextField(
+            controller: controller,
             maxLines: maxLines,
-            keyboardType: keyboardType,
-            onChanged: onChanged,
+            keyboardType: ProviderFieldInput.keyboardType(
+              inputKind,
+              maxLines: maxLines,
+            ),
+            inputFormatters: <TextInputFormatter>[
+              ...ProviderFieldInput.formatters(inputKind),
+            ],
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: const TextStyle(color: Colors.black26, fontSize: 14),

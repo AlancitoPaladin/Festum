@@ -4,6 +4,10 @@ import 'package:festum/core/network/api_url_resolver.dart';
 import 'package:festum/core/services/auth_state_service.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/custom_app_bar.dart';
+import 'package:festum/features/provider/usecases/get_provider_business_profile_use_case.dart';
+import 'package:festum/features/provider/usecases/save_provider_business_profile_use_case.dart';
+import 'package:festum/features/provider/usecases/upload_provider_business_logo_use_case.dart';
+import 'package:festum/features/provider/usecases/upload_provider_business_photo_use_case.dart';
 import 'package:festum/features/provider/utils/provider_field_input.dart';
 import 'package:festum/features/provider/viewmodels/provider_business_info_viewmodel.dart';
 import 'package:flutter/material.dart';
@@ -32,8 +36,16 @@ class ProviderBusinessInfoView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ViewModelBuilder<ProviderBusinessInfoViewModel>.reactive(
-      viewModelBuilder: () =>
-          ProviderBusinessInfoViewModel(locator(), locator(), locator()),
+      viewModelBuilder: () => ProviderBusinessInfoViewModel(
+        locator<GetProviderBusinessProfileUseCase>(),
+        locator<SaveProviderBusinessProfileUseCase>(),
+        locator<UploadProviderBusinessLogoUseCase>(),
+        locator<UploadProviderBusinessPhotoUseCase>(),
+        locator(),
+        locator(),
+        locator(),
+        locator(),
+      ),
       onViewModelReady: (ProviderBusinessInfoViewModel model) {
         model.initialize();
       },

@@ -286,8 +286,167 @@ class ApiClient {
     return _toMap(response.data);
   }
 
+  Future<Map<String, dynamic>> getProviderProductAvailability({
+    required String productId,
+    required int year,
+    required int month,
+  }) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '$_providersBasePath/me/products/$productId/availability',
+      queryParameters: <String, dynamic>{'year': year, 'month': month},
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> createManualBooking({
+    required String productId,
+    required Map<String, dynamic> body,
+  }) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '$_providersBasePath/me/products/$productId/bookings/manual',
+      data: body,
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> getProviderBookingDetail(String bookingId) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '$_providersBasePath/me/bookings/$bookingId',
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> updateProviderBooking(
+    String bookingId,
+    Map<String, dynamic> body,
+  ) async {
+    final Response<dynamic> response = await _dio.patch<dynamic>(
+      '$_providersBasePath/me/bookings/$bookingId',
+      data: body,
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> updateProviderBookingStatus(
+    String bookingId,
+    String status,
+  ) async {
+    final Response<dynamic> response = await _dio.patch<dynamic>(
+      '$_providersBasePath/me/bookings/$bookingId/status',
+      data: <String, dynamic>{'status': status},
+    );
+    return _toMap(response.data);
+  }
+
+  Future<void> blockProviderProductDate({
+    required String productId,
+    required String date,
+  }) async {
+    await _dio.post<dynamic>(
+      '$_providersBasePath/me/products/$productId/availability/blocks',
+      data: <String, dynamic>{'date': date},
+    );
+  }
+
+  Future<void> unblockProviderProductDate({
+    required String productId,
+    required String date,
+  }) async {
+    await _dio.delete<dynamic>(
+      '$_providersBasePath/me/products/$productId/availability/blocks',
+      data: <String, dynamic>{'date': date},
+    );
+  }
+
+  Future<Map<String, dynamic>> getProviderServiceProductsById(
+    String serviceId,
+  ) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '$_providersBasePath/me/services/$serviceId/products',
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> createProviderProduct(
+    String serviceId,
+    Map<String, dynamic> payload,
+  ) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '$_providersBasePath/me/services/$serviceId/products',
+      data: payload,
+    );
+    return _toMap(response.data);
+  }
+
   Future<void> deleteProviderProduct(String productId) async {
     await _dio.delete<dynamic>('$_providersBasePath/me/products/$productId');
+  }
+
+  Future<Map<String, dynamic>> getProviderProductById(String productId) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '$_providersBasePath/me/products/$productId',
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> updateProviderProductById(
+    String productId,
+    Map<String, dynamic> payload,
+  ) async {
+    final Response<dynamic> response = await _dio.patch<dynamic>(
+      '$_providersBasePath/me/products/$productId',
+      data: payload,
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> updateProviderProductStatus(
+    String productId,
+    String status,
+  ) async {
+    final Response<dynamic> response = await _dio.patch<dynamic>(
+      '$_providersBasePath/me/products/$productId/status',
+      data: <String, dynamic>{'status': status},
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> uploadProviderProductImage({
+    required String productId,
+    required String filePath,
+    required bool isMain,
+  }) async {
+    final String fileName = _fileNameFromPath(filePath);
+    final FormData formData = FormData.fromMap(<String, dynamic>{
+      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      'is_main': isMain,
+    });
+
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '$_providersBasePath/me/products/$productId/images',
+      data: formData,
+    );
+    return _toMap(response.data);
+  }
+
+  Future<void> setProviderProductMainImage({
+    required String productId,
+    required String imageKey,
+  }) async {
+    await _dio.patch<dynamic>(
+      '$_providersBasePath/me/products/$productId/images/main',
+      data: <String, dynamic>{'image_key': imageKey},
+    );
+  }
+
+  Future<void> deleteProviderProductImage({
+    required String productId,
+    required String imageKey,
+  }) async {
+    await _dio.delete<dynamic>(
+      '$_providersBasePath/me/products/$productId/images',
+      data: <String, dynamic>{'image_key': imageKey},
+    );
   }
 
   Future<Map<String, dynamic>> getProviderServices() async {
@@ -297,15 +456,96 @@ class ApiClient {
     return _toMap(response.data);
   }
 
+  Future<Map<String, dynamic>> getClientProductAvailability({
+    required String productId,
+    required int year,
+    required int month,
+  }) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '$_clientBasePath/products/$productId/availability',
+      queryParameters: <String, dynamic>{'year': year, 'month': month},
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> createProviderService(
+    Map<String, dynamic> payload,
+  ) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '$_providersBasePath/me/services',
+      data: payload,
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> updateProviderService(
+    String serviceId,
+    Map<String, dynamic> payload,
+  ) async {
+    final Response<dynamic> response = await _dio.patch<dynamic>(
+      '$_providersBasePath/me/services/$serviceId',
+      data: payload,
+    );
+    return _toMap(response.data);
+  }
+
   Future<Map<String, dynamic>> updateProviderServiceStatus(
     String serviceId,
     String status,
   ) async {
     final Response<dynamic> response = await _dio.patch<dynamic>(
-      '$_providersBasePath/me/services/$serviceId',
+      '$_providersBasePath/me/services/$serviceId/status',
       data: <String, dynamic>{'status': status},
     );
     return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> uploadProviderServiceImage({
+    required String serviceId,
+    required String filePath,
+    required bool isMain,
+  }) async {
+    final String fileName = _fileNameFromPath(filePath);
+    final FormData formData = FormData.fromMap(<String, dynamic>{
+      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      'is_main': isMain,
+    });
+
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '$_providersBasePath/me/services/$serviceId/images',
+      data: formData,
+    );
+    return _toMap(response.data);
+  }
+
+  Future<void> setProviderServiceMainImage({
+    required String serviceId,
+    required String imageKey,
+  }) async {
+    await _dio.patch<dynamic>(
+      '$_providersBasePath/me/services/$serviceId/images/main',
+      data: <String, dynamic>{'image_key': imageKey},
+    );
+  }
+
+  Future<void> reorderProviderServiceImages({
+    required String serviceId,
+    required List<String> imageKeys,
+  }) async {
+    await _dio.patch<dynamic>(
+      '$_providersBasePath/me/services/$serviceId/images/reorder',
+      data: <String, dynamic>{'image_keys': imageKeys},
+    );
+  }
+
+  Future<void> deleteProviderServiceImage({
+    required String serviceId,
+    required String imageKey,
+  }) async {
+    await _dio.delete<dynamic>(
+      '$_providersBasePath/me/services/$serviceId/images',
+      data: <String, dynamic>{'image_key': imageKey},
+    );
   }
 
   Future<void> deleteProviderService(String serviceId) async {

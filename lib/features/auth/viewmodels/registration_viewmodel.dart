@@ -1,6 +1,8 @@
 import 'package:festum/core/models/account_role.dart';
 import 'package:festum/core/services/auth_state_service.dart';
+import 'package:festum/core/services/provider_branding_service.dart';
 import 'package:festum/core/services/provider_business_info_state_service.dart';
+import 'package:festum/core/services/provider_reactivity_service.dart';
 import 'package:festum/core/services/registration_state_service.dart';
 import 'package:festum/features/auth/repositories/auth_repository.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +15,8 @@ class RegistrationViewModel extends BaseViewModel {
     this._authStateService,
     this._registrationStateService,
     this._providerBusinessInfoStateService,
+    this._providerBrandingService,
+    this._providerReactivityService,
   );
 
   final AccountRole role;
@@ -20,6 +24,8 @@ class RegistrationViewModel extends BaseViewModel {
   final AuthStateService _authStateService;
   final RegistrationStateService _registrationStateService;
   final ProviderBusinessInfoStateService _providerBusinessInfoStateService;
+  final ProviderBrandingService _providerBrandingService;
+  final ProviderReactivityService _providerReactivityService;
 
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   final TextEditingController firstNameController = TextEditingController();
@@ -57,6 +63,8 @@ class RegistrationViewModel extends BaseViewModel {
       if (role == AccountRole.provider) {
         await _providerBusinessInfoStateService.resetBusinessInfoProgress();
       }
+      await _providerBrandingService.clear();
+      await _providerReactivityService.clear();
 
       await _registrationStateService.completeRegistration(role);
       await _authStateService.signIn(

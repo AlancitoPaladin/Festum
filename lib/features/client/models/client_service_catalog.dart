@@ -15,6 +15,26 @@ enum ClientServiceCategory {
     slug: 'banquetes',
     title: 'Banquetes',
     icon: Icons.restaurant_menu_rounded,
+  ),
+  dj(
+    slug: 'dj',
+    title: 'Musica / DJ',
+    icon: Icons.music_note_rounded,
+  ),
+  decoration(
+    slug: 'decoracion',
+    title: 'Decoracion',
+    icon: Icons.celebration_rounded,
+  ),
+  photography(
+    slug: 'fotografia',
+    title: 'Fotografia y video',
+    icon: Icons.camera_alt_rounded,
+  ),
+  entertainment(
+    slug: 'entretenimiento',
+    title: 'Entretenimiento',
+    icon: Icons.theater_comedy_rounded,
   );
 
   const ClientServiceCategory({
@@ -45,6 +65,7 @@ class ClientServiceItem {
     required this.priceLabel,
     required this.unitPriceCents,
     required this.badge,
+    this.products = const <ClientServiceProduct>[],
     this.imageKey = '',
     this.imageUrl = '',
     this.imageExpiresAt,
@@ -58,6 +79,7 @@ class ClientServiceItem {
   final String priceLabel;
   final int unitPriceCents;
   final String badge;
+  final List<ClientServiceProduct> products;
   final String imageKey;
   final String imageUrl;
   final DateTime? imageExpiresAt;
@@ -75,10 +97,36 @@ class ClientServiceItem {
     }
     final int pivot = input.lastIndexOf(' ', maxChars);
     if (pivot <= 0) {
-      return '${input.substring(0, maxChars - 1)}…';
+      return '${input.substring(0, maxChars - 1)}...';
     }
-    return '${input.substring(0, pivot)}…';
+    return '${input.substring(0, pivot)}...';
   }
+}
+
+class ClientServiceProduct {
+  const ClientServiceProduct({
+    required this.id,
+    required this.serviceId,
+    required this.name,
+    required this.description,
+    required this.priceLabel,
+    required this.unitPriceCents,
+    required this.category,
+    this.imageKey = '',
+    this.imageUrl = '',
+    this.imageExpiresAt,
+  });
+
+  final String id;
+  final String serviceId;
+  final String name;
+  final String description;
+  final String priceLabel;
+  final int unitPriceCents;
+  final String category;
+  final String imageKey;
+  final String imageUrl;
+  final DateTime? imageExpiresAt;
 }
 
 class ClientServiceCatalog {
@@ -107,7 +155,7 @@ class ClientServiceCatalog {
         ClientServiceCategory.socialHalls: <ClientServiceItem>[
           ClientServiceItem(
             id: 'hall-norte',
-            name: 'Salón Norte Imperial',
+            name: 'Salon Norte Imperial',
             subtitle: 'Hasta 350 invitados',
             priceLabel: 'Desde \$45,000 MXN',
             unitPriceCents: 4500000,
@@ -116,15 +164,15 @@ class ClientServiceCatalog {
           ClientServiceItem(
             id: 'hall-bosque',
             name: 'Terraza Bosque Alto',
-            subtitle: 'Formato jardín con pista',
+            subtitle: 'Formato jardin con pista',
             priceLabel: 'Desde \$38,500 MXN',
             unitPriceCents: 3850000,
             badge: 'Exterior',
           ),
           ClientServiceItem(
             id: 'hall-aurora',
-            name: 'Salón Aurora',
-            subtitle: 'Paquete completo con iluminación',
+            name: 'Salon Aurora',
+            subtitle: 'Paquete completo con iluminacion',
             priceLabel: 'Desde \$41,200 MXN',
             unitPriceCents: 4120000,
             badge: 'Premium',
@@ -160,15 +208,15 @@ class ClientServiceCatalog {
           ClientServiceItem(
             id: 'banq-signature',
             name: 'Banquete Signature',
-            subtitle: 'Menú gourmet personalizable',
+            subtitle: 'Menu gourmet personalizable',
             priceLabel: 'Desde \$740 p/p',
             unitPriceCents: 74000,
             badge: 'Chef',
           ),
           ClientServiceItem(
             id: 'banq-mex',
-            name: 'Tradición Mexicana',
-            subtitle: 'Estaciones y menú regional',
+            name: 'Tradicion Mexicana',
+            subtitle: 'Estaciones y menu regional',
             priceLabel: 'Desde \$590 p/p',
             unitPriceCents: 59000,
             badge: 'Tradicional',
@@ -180,6 +228,46 @@ class ClientServiceCatalog {
             priceLabel: 'Desde \$8,500 MXN',
             unitPriceCents: 850000,
             badge: 'Dulce',
+          ),
+        ],
+        ClientServiceCategory.dj: <ClientServiceItem>[
+          ClientServiceItem(
+            id: 'dj-night',
+            name: 'DJ Night Experience',
+            subtitle: 'Audio, cabina e iluminacion',
+            priceLabel: 'Desde \$6,500 MXN',
+            unitPriceCents: 650000,
+            badge: 'Party',
+          ),
+        ],
+        ClientServiceCategory.decoration: <ClientServiceItem>[
+          ClientServiceItem(
+            id: 'deco-romance',
+            name: 'Decoracion Romance',
+            subtitle: 'Montaje floral y mesa principal',
+            priceLabel: 'Desde \$9,900 MXN',
+            unitPriceCents: 990000,
+            badge: 'Romantico',
+          ),
+        ],
+        ClientServiceCategory.photography: <ClientServiceItem>[
+          ClientServiceItem(
+            id: 'photo-cinema',
+            name: 'Cobertura Foto y Video',
+            subtitle: 'Sesion, teaser y entrega digital',
+            priceLabel: 'Desde \$13,500 MXN',
+            unitPriceCents: 1350000,
+            badge: 'Cinema',
+          ),
+        ],
+        ClientServiceCategory.entertainment: <ClientServiceItem>[
+          ClientServiceItem(
+            id: 'show-led',
+            name: 'Show de Robots LED',
+            subtitle: 'Apertura de pista y performance',
+            priceLabel: 'Desde \$7,200 MXN',
+            unitPriceCents: 720000,
+            badge: 'Impacto',
           ),
         ],
       };

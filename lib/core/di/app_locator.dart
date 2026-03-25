@@ -6,15 +6,20 @@ import 'package:festum/core/network/api_client.dart';
 import 'package:festum/core/network/auth_interceptor.dart';
 import 'package:festum/core/network/session_interceptor.dart';
 import 'package:festum/core/services/auth_state_service.dart';
+import 'package:festum/core/services/provider_branding_service.dart';
 import 'package:festum/core/services/provider_business_info_state_service.dart';
+import 'package:festum/core/services/provider_reactivity_service.dart';
 import 'package:festum/core/services/registration_state_service.dart';
 import 'package:festum/features/auth/repositories/auth_repository.dart';
 import 'package:festum/features/client/repositories/client_cart_repository.dart';
+import 'package:festum/features/client/repositories/client_availability_repository.dart';
 import 'package:festum/features/client/repositories/client_orders_repository.dart';
 import 'package:festum/features/client/repositories/client_services_repository.dart';
+import 'package:festum/features/client/repositories/api/api_client_availability_repository.dart';
 import 'package:festum/features/client/repositories/api/api_client_cart_repository.dart';
 import 'package:festum/features/client/repositories/api/api_client_orders_repository.dart';
 import 'package:festum/features/client/repositories/api/api_client_services_repository.dart';
+import 'package:festum/features/client/repositories/mock/mock_client_availability_repository.dart';
 import 'package:festum/features/client/repositories/mock/mock_client_cart_repository.dart';
 import 'package:festum/features/client/repositories/mock/mock_client_orders_repository.dart';
 import 'package:festum/features/client/repositories/mock/mock_client_services_repository.dart';
@@ -24,6 +29,7 @@ import 'package:festum/features/client/usecases/checkout_cart_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_cart_items_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_home_sections_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_orders_use_case.dart';
+import 'package:festum/features/client/usecases/get_client_product_availability_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_service_by_id_use_case.dart';
 import 'package:festum/features/client/usecases/get_services_by_category_use_case.dart';
 import 'package:festum/features/client/usecases/is_service_in_cart_use_case.dart';
@@ -31,9 +37,46 @@ import 'package:festum/features/client/usecases/remove_client_cart_item_use_case
 import 'package:festum/features/client/usecases/restore_client_cart_item_use_case.dart';
 import 'package:festum/features/client/usecases/update_client_order_status_use_case.dart';
 import 'package:festum/features/provider/repositories/provider_business_repository.dart';
+import 'package:festum/features/provider/repositories/provider_availability_repository.dart';
+import 'package:festum/features/provider/repositories/provider_bookings_repository.dart';
 import 'package:festum/features/provider/repositories/provider_home_repository.dart';
+import 'package:festum/features/provider/repositories/provider_products_repository.dart';
 import 'package:festum/features/provider/repositories/provider_reservations_repository.dart';
 import 'package:festum/features/provider/repositories/provider_services_repository.dart';
+import 'package:festum/features/provider/usecases/block_provider_product_date_use_case.dart';
+import 'package:festum/features/provider/usecases/clear_provider_notifications_use_case.dart';
+import 'package:festum/features/provider/usecases/create_provider_product_use_case.dart';
+import 'package:festum/features/provider/usecases/create_provider_service_use_case.dart';
+import 'package:festum/features/provider/usecases/create_manual_booking_use_case.dart';
+import 'package:festum/features/provider/usecases/delete_provider_product_image_use_case.dart';
+import 'package:festum/features/provider/usecases/delete_provider_service_image_use_case.dart';
+import 'package:festum/features/provider/usecases/delete_provider_product_use_case.dart';
+import 'package:festum/features/provider/usecases/delete_provider_service_product_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_business_profile_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_booking_detail_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_home_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_notifications_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_product_availability_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_product_detail_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_product_reservations_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_service_products_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_services_use_case.dart';
+import 'package:festum/features/provider/usecases/mark_all_provider_notifications_as_read_use_case.dart';
+import 'package:festum/features/provider/usecases/mark_provider_notification_as_read_use_case.dart';
+import 'package:festum/features/provider/usecases/save_provider_business_profile_use_case.dart';
+import 'package:festum/features/provider/usecases/set_provider_product_main_image_use_case.dart';
+import 'package:festum/features/provider/usecases/set_provider_service_main_image_use_case.dart';
+import 'package:festum/features/provider/usecases/upload_provider_business_logo_use_case.dart';
+import 'package:festum/features/provider/usecases/upload_provider_business_photo_use_case.dart';
+import 'package:festum/features/provider/usecases/upload_provider_product_image_use_case.dart';
+import 'package:festum/features/provider/usecases/upload_provider_service_image_use_case.dart';
+import 'package:festum/features/provider/usecases/update_provider_booking_status_use_case.dart';
+import 'package:festum/features/provider/usecases/update_provider_booking_use_case.dart';
+import 'package:festum/features/provider/usecases/update_provider_product_use_case.dart';
+import 'package:festum/features/provider/usecases/update_provider_product_status_use_case.dart';
+import 'package:festum/features/provider/usecases/update_provider_service_status_use_case.dart';
+import 'package:festum/features/provider/usecases/update_provider_service_use_case.dart';
+import 'package:festum/features/provider/usecases/unblock_provider_product_date_use_case.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
@@ -55,6 +98,12 @@ Future<void> setupLocator() async {
 
   locator.registerLazySingleton<ProviderBusinessInfoStateService>(
     () => ProviderBusinessInfoStateService(locator<SharedPreferences>()),
+  );
+  locator.registerLazySingleton<ProviderBrandingService>(
+    ProviderBrandingService.new,
+  );
+  locator.registerLazySingleton<ProviderReactivityService>(
+    ProviderReactivityService.new,
   );
 
   locator.registerLazySingleton<Dio>(() {
@@ -86,18 +135,174 @@ Future<void> setupLocator() async {
   locator.registerLazySingleton<ProviderHomeRepository>(
     () => ProviderHomeRepository(locator<ApiClient>()),
   );
+  locator.registerLazySingleton<GetProviderHomeUseCase>(
+    () => GetProviderHomeUseCase(locator<ProviderHomeRepository>()),
+  );
+  locator.registerLazySingleton<GetProviderNotificationsUseCase>(
+    () => GetProviderNotificationsUseCase(locator<ProviderHomeRepository>()),
+  );
+  locator.registerLazySingleton<MarkProviderNotificationAsReadUseCase>(
+    () => MarkProviderNotificationAsReadUseCase(
+      locator<ProviderHomeRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<MarkAllProviderNotificationsAsReadUseCase>(
+    () => MarkAllProviderNotificationsAsReadUseCase(
+      locator<ProviderHomeRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<ClearProviderNotificationsUseCase>(
+    () => ClearProviderNotificationsUseCase(locator<ProviderHomeRepository>()),
+  );
   locator.registerLazySingleton<ProviderBusinessRepository>(
     () => ProviderBusinessRepository(locator<ApiClient>()),
+  );
+  locator.registerLazySingleton<GetProviderBusinessProfileUseCase>(
+    () => GetProviderBusinessProfileUseCase(
+      locator<ProviderBusinessRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<SaveProviderBusinessProfileUseCase>(
+    () => SaveProviderBusinessProfileUseCase(
+      locator<ProviderBusinessRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<UploadProviderBusinessLogoUseCase>(
+    () => UploadProviderBusinessLogoUseCase(
+      locator<ProviderBusinessRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<UploadProviderBusinessPhotoUseCase>(
+    () => UploadProviderBusinessPhotoUseCase(
+      locator<ProviderBusinessRepository>(),
+    ),
   );
   locator.registerLazySingleton<ProviderReservationsRepository>(
     () => ProviderReservationsRepository(locator<ApiClient>()),
   );
+  locator.registerLazySingleton<GetProviderProductReservationsUseCase>(
+    () => GetProviderProductReservationsUseCase(
+      locator<ProviderReservationsRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<DeleteProviderProductUseCase>(
+    () => DeleteProviderProductUseCase(
+      locator<ProviderReservationsRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<ProviderBookingsRepository>(
+    () => ProviderBookingsRepository(locator<ApiClient>()),
+  );
+  locator.registerLazySingleton<CreateManualBookingUseCase>(
+    () => CreateManualBookingUseCase(locator<ProviderBookingsRepository>()),
+  );
+  locator.registerLazySingleton<GetProviderBookingDetailUseCase>(
+    () => GetProviderBookingDetailUseCase(locator<ProviderBookingsRepository>()),
+  );
+  locator.registerLazySingleton<UpdateProviderBookingUseCase>(
+    () => UpdateProviderBookingUseCase(locator<ProviderBookingsRepository>()),
+  );
+  locator.registerLazySingleton<UpdateProviderBookingStatusUseCase>(
+    () => UpdateProviderBookingStatusUseCase(
+      locator<ProviderBookingsRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<ProviderAvailabilityRepository>(
+    () => ProviderAvailabilityRepository(locator<ApiClient>()),
+  );
+  locator.registerLazySingleton<GetProviderProductAvailabilityUseCase>(
+    () => GetProviderProductAvailabilityUseCase(
+      locator<ProviderAvailabilityRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<BlockProviderProductDateUseCase>(
+    () => BlockProviderProductDateUseCase(
+      locator<ProviderAvailabilityRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<UnblockProviderProductDateUseCase>(
+    () => UnblockProviderProductDateUseCase(
+      locator<ProviderAvailabilityRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<ProviderProductsRepository>(
+    () => ProviderProductsRepository(locator<ApiClient>()),
+  );
+  locator.registerLazySingleton<CreateProviderProductUseCase>(
+    () => CreateProviderProductUseCase(locator<ProviderProductsRepository>()),
+  );
+  locator.registerLazySingleton<GetProviderServiceProductsUseCase>(
+    () => GetProviderServiceProductsUseCase(
+      locator<ProviderProductsRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<DeleteProviderServiceProductUseCase>(
+    () => DeleteProviderServiceProductUseCase(
+      locator<ProviderProductsRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<GetProviderProductDetailUseCase>(
+    () => GetProviderProductDetailUseCase(locator<ProviderProductsRepository>()),
+  );
+  locator.registerLazySingleton<UpdateProviderProductUseCase>(
+    () => UpdateProviderProductUseCase(locator<ProviderProductsRepository>()),
+  );
+  locator.registerLazySingleton<UpdateProviderProductStatusUseCase>(
+    () => UpdateProviderProductStatusUseCase(
+      locator<ProviderProductsRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<UploadProviderProductImageUseCase>(
+    () => UploadProviderProductImageUseCase(locator<ProviderProductsRepository>()),
+  );
+  locator.registerLazySingleton<SetProviderProductMainImageUseCase>(
+    () => SetProviderProductMainImageUseCase(
+      locator<ProviderProductsRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<DeleteProviderProductImageUseCase>(
+    () => DeleteProviderProductImageUseCase(
+      locator<ProviderProductsRepository>(),
+    ),
+  );
   locator.registerLazySingleton<ProviderServicesRepository>(
     () => ProviderServicesRepository(locator<ApiClient>()),
+  );
+  locator.registerLazySingleton<CreateProviderServiceUseCase>(
+    () => CreateProviderServiceUseCase(locator<ProviderServicesRepository>()),
+  );
+  locator.registerLazySingleton<GetProviderServicesUseCase>(
+    () => GetProviderServicesUseCase(locator<ProviderServicesRepository>()),
+  );
+  locator.registerLazySingleton<UpdateProviderServiceUseCase>(
+    () => UpdateProviderServiceUseCase(locator<ProviderServicesRepository>()),
+  );
+  locator.registerLazySingleton<UpdateProviderServiceStatusUseCase>(
+    () => UpdateProviderServiceStatusUseCase(
+      locator<ProviderServicesRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<UploadProviderServiceImageUseCase>(
+    () => UploadProviderServiceImageUseCase(
+      locator<ProviderServicesRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<SetProviderServiceMainImageUseCase>(
+    () => SetProviderServiceMainImageUseCase(
+      locator<ProviderServicesRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<DeleteProviderServiceImageUseCase>(
+    () => DeleteProviderServiceImageUseCase(
+      locator<ProviderServicesRepository>(),
+    ),
   );
   locator.registerLazySingleton<ImagePicker>(ImagePicker.new);
 
   if (AppEnvironment.useClientMocks) {
+    locator.registerLazySingleton<ClientAvailabilityRepository>(
+      MockClientAvailabilityRepository.new,
+    );
     locator.registerLazySingleton<ClientServicesRepository>(
       MockClientServicesRepository.new,
     );
@@ -108,6 +313,9 @@ Future<void> setupLocator() async {
       MockClientCartRepository.new,
     );
   } else {
+    locator.registerLazySingleton<ClientAvailabilityRepository>(
+      () => ApiClientAvailabilityRepository(locator<ApiClient>()),
+    );
     locator.registerLazySingleton<ClientServicesRepository>(
       () => ApiClientServicesRepository(locator<ApiClient>()),
     );
@@ -127,6 +335,11 @@ Future<void> setupLocator() async {
   );
   locator.registerLazySingleton<GetClientServiceByIdUseCase>(
     () => GetClientServiceByIdUseCase(locator<ClientServicesRepository>()),
+  );
+  locator.registerLazySingleton<GetClientProductAvailabilityUseCase>(
+    () => GetClientProductAvailabilityUseCase(
+      locator<ClientAvailabilityRepository>(),
+    ),
   );
   locator.registerLazySingleton<GetClientOrdersUseCase>(
     () => GetClientOrdersUseCase(locator<ClientOrdersRepository>()),
@@ -211,6 +424,8 @@ Future<void> _syncProviderBusinessInfoProgress() async {
   final AuthStateService authStateService = locator<AuthStateService>();
   if (!authStateService.isAuthenticated ||
       authStateService.role != AccountRole.provider) {
+    await locator<ProviderBrandingService>().clear();
+    await locator<ProviderReactivityService>().clear();
     return;
   }
 
@@ -227,10 +442,15 @@ Future<void> _syncProviderBusinessInfoProgress() async {
     await locator<ProviderBusinessInfoStateService>().syncBusinessInfoProgress(
       hasCompletedBusinessInfo,
     );
+    await locator<ProviderBrandingService>().sync(
+      businessName: profile.businessName,
+      logoUrl: profile.logoUrl,
+    );
   } on DioException catch (error) {
     if (error.response?.statusCode == 404) {
       await locator<ProviderBusinessInfoStateService>()
           .syncBusinessInfoProgress(false);
+      await locator<ProviderBrandingService>().clear();
     }
   }
 }
