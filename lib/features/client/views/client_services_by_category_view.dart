@@ -38,6 +38,8 @@ class _ClientServicesByCategoryViewState
   List<ClientServiceItem> _services = <ClientServiceItem>[];
   Set<String> _cartServiceIds = <String>{};
   Set<String> _addingServiceIds = <String>{};
+  Set<String> _recentlyAddedServiceIds = <String>{};
+  Set<String> _addErrorServiceIds = <String>{};
   bool _didRefreshAfterImage403 = false;
 
   @override
@@ -102,6 +104,16 @@ class _ClientServicesByCategoryViewState
   }
 
   Future<void> _addService(ClientServiceItem item) async {
+    if (item.products.isNotEmpty) {
+      context.go(
+        AppRoutes.clientServiceDetails(
+          category: widget.category.slug,
+          serviceId: item.id,
+        ),
+      );
+      return;
+    }
+
     if (_cartServiceIds.contains(item.id) ||
         _addingServiceIds.contains(item.id)) {
       ClientFeedback.showMessage(
@@ -114,6 +126,9 @@ class _ClientServicesByCategoryViewState
 
     setState(() {
       _addingServiceIds = <String>{..._addingServiceIds, item.id};
+      _addErrorServiceIds = <String>{..._addErrorServiceIds}..remove(item.id);
+      _recentlyAddedServiceIds = <String>{..._recentlyAddedServiceIds}
+        ..remove(item.id);
     });
     final bool added = await _addServiceToCartUseCase(
       serviceId: item.id,
@@ -127,6 +142,10 @@ class _ClientServicesByCategoryViewState
       _addingServiceIds = <String>{..._addingServiceIds}..remove(item.id);
     });
     if (!added) {
+      setState(() {
+        _addErrorServiceIds = <String>{..._addErrorServiceIds, item.id};
+      });
+      _clearTransientAddState(item.id);
       ClientFeedback.showMessage(
         context,
         message: 'Este servicio ya está en el carrito.',
@@ -138,13 +157,30 @@ class _ClientServicesByCategoryViewState
 
     setState(() {
       _cartServiceIds = <String>{..._cartServiceIds, item.id};
+      _recentlyAddedServiceIds = <String>{..._recentlyAddedServiceIds, item.id};
+      _addErrorServiceIds = <String>{..._addErrorServiceIds}..remove(item.id);
     });
+    _clearTransientAddState(item.id);
     _tabUiStateService.setCartCount(_cartServiceIds.length);
     ClientFeedback.showMessage(
       context,
       message: 'Servicio agregado al carrito.',
     );
     HapticFeedback.lightImpact();
+  }
+
+  void _clearTransientAddState(String serviceId) {
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _recentlyAddedServiceIds = <String>{..._recentlyAddedServiceIds}
+          ..remove(serviceId);
+        _addErrorServiceIds = <String>{..._addErrorServiceIds}
+          ..remove(serviceId);
+      });
+    });
   }
 
   @override
@@ -249,7 +285,11 @@ class _ClientServicesByCategoryViewState
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: <Widget>[
                     IconButton(
-                      tooltip: _cartServiceIds.contains(item.id)
+                      tooltip: _addErrorServiceIds.contains(item.id)
+                          ? 'Error al agregar'
+                          : _recentlyAddedServiceIds.contains(item.id)
+                          ? 'Agregado'
+                          : _cartServiceIds.contains(item.id)
                           ? 'Ver carrito'
                           : 'Agregar',
                       onPressed: _addingServiceIds.contains(item.id)
@@ -263,11 +303,44 @@ class _ClientServicesByCategoryViewState
                               width: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Icon(
-                              _cartServiceIds.contains(item.id)
-                                  ? Icons.shopping_cart_checkout_rounded
-                                  : Icons.add_shopping_cart_rounded,
-                              size: 20,
+                          : TweenAnimationBuilder<double>(
+                              tween: Tween<double>(
+                                begin: 0,
+                                end: _recentlyAddedServiceIds.contains(item.id)
+                                    ? 1
+                                    : 0,
+                              ),
+                              duration: const Duration(milliseconds: 380),
+                              curve: Curves.easeOutCubic,
+                              builder:
+                                  (
+                                    BuildContext context,
+                                    double pulse,
+                                    Widget? child,
+                                  ) {
+                                    final double scale =
+                                        1 +
+                                        (0.16 * (1 - (2 * pulse - 1).abs()));
+                                    return Transform.scale(
+                                      scale: scale,
+                                      child: child,
+                                    );
+                                  },
+                              child: Icon(
+                                _addErrorServiceIds.contains(item.id)
+                                    ? Icons.error_outline_rounded
+                                    : _recentlyAddedServiceIds.contains(item.id)
+                                    ? Icons.check_circle_rounded
+                                    : _cartServiceIds.contains(item.id)
+                                    ? Icons.shopping_cart_checkout_rounded
+                                    : Icons.add_shopping_cart_rounded,
+                                size: 21,
+                                color: _addErrorServiceIds.contains(item.id)
+                                    ? AppColors.alert
+                                    : _recentlyAddedServiceIds.contains(item.id)
+                                    ? AppColors.activeIcon
+                                    : null,
+                              ),
                             ),
                     ),
                     const Icon(Icons.chevron_right_rounded),

@@ -20,13 +20,35 @@ class ApiClientServicesRepository implements ClientServicesRepository {
             category: <ClientServiceItem>[],
         };
 
+    final List<ClientServiceItem> uncategorizedItems = <ClientServiceItem>[];
+    for (final MapEntry<String, List<Map<String, dynamic>>> entry
+        in payload.entries) {
+      if (ClientServiceCategory.fromSlug(entry.key) != null) {
+        continue;
+      }
+      uncategorizedItems.addAll(
+        entry.value
+            .map(ClientServiceItemDto.fromJson)
+            .map((ClientServiceItemDto dto) => dto.toDomain()),
+      );
+    }
+
     for (final ClientServiceCategory category in ClientServiceCategory.values) {
       final List<Map<String, dynamic>> raw =
           payload[category.slug] ?? <Map<String, dynamic>>[];
-      sections[category] = raw
+      final List<ClientServiceItem> mapped = raw
           .map(ClientServiceItemDto.fromJson)
           .map((ClientServiceItemDto dto) => dto.toDomain())
           .toList();
+      if (category == ClientServiceCategory.uncategorized &&
+          uncategorizedItems.isNotEmpty) {
+        sections[category] = <ClientServiceItem>[
+          ...mapped,
+          ...uncategorizedItems,
+        ];
+        continue;
+      }
+      sections[category] = mapped;
     }
 
     return sections;

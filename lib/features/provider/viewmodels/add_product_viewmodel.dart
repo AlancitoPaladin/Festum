@@ -37,7 +37,7 @@ class AddProductViewModel extends BaseViewModel {
   }
 
   void updatePrice(String value) {
-    _formData.price = double.tryParse(value) ?? 0;
+    _formData.price = ProductFormData.parseDecimalInput(value);
     _clearFieldError('price');
   }
 
@@ -72,8 +72,10 @@ class AddProductViewModel extends BaseViewModel {
     notifyListeners();
   }
 
-  void updateMinGuests(String value) => _formData.minGuests = int.tryParse(value);
-  void updateMaxGuests(String value) => _formData.maxGuests = int.tryParse(value);
+  void updateMinGuests(String value) =>
+      _formData.minGuests = int.tryParse(value);
+  void updateMaxGuests(String value) =>
+      _formData.maxGuests = int.tryParse(value);
   void updateMenuIncluded(String value) => _formData.menuIncluded = value;
   void updateDimensions(String value) => _formData.dimensions = value;
   void updateWeight(String value) => _formData.weight = value;
@@ -101,7 +103,7 @@ class AddProductViewModel extends BaseViewModel {
   }
 
   void updateExtraHourPrice(String value) =>
-      _formData.extraHourPrice = double.tryParse(value) ?? 0;
+      _formData.extraHourPrice = ProductFormData.parseDecimalInput(value);
 
   void togglePricePerHour() {
     _formData.isPricePerHour = !_formData.isPricePerHour;

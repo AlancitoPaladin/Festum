@@ -9,6 +9,9 @@ abstract class ClientCartRepository {
     required String serviceId,
     required String name,
     required int unitPriceCents,
+    String? productId,
+    String? productName,
+    List<String>? selectedProductIds,
   });
 
   Future<ClientCartItem?> removeItem(String id);

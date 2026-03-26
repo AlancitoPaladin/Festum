@@ -39,6 +39,8 @@ class _ClientHomeViewState extends State<ClientHomeView> {
       <ClientServiceCategory, List<ClientServiceItem>>{};
   Set<String> _cartServiceIds = <String>{};
   Set<String> _addingServiceIds = <String>{};
+  Set<String> _recentlyAddedServiceIds = <String>{};
+  Set<String> _addErrorServiceIds = <String>{};
   bool _didRefreshAfterImage403 = false;
 
   @override
@@ -122,7 +124,20 @@ class _ClientHomeViewState extends State<ClientHomeView> {
     _tabUiStateService.setCartCount(cartItems.length);
   }
 
-  Future<void> _addService(ClientServiceItem item) async {
+  Future<void> _addService({
+    required ClientServiceCategory category,
+    required ClientServiceItem item,
+  }) async {
+    if (item.products.isNotEmpty) {
+      context.go(
+        AppRoutes.clientServiceDetails(
+          category: category.slug,
+          serviceId: item.id,
+        ),
+      );
+      return;
+    }
+
     if (_cartServiceIds.contains(item.id) ||
         _addingServiceIds.contains(item.id)) {
       ClientFeedback.showMessage(
@@ -135,6 +150,9 @@ class _ClientHomeViewState extends State<ClientHomeView> {
 
     setState(() {
       _addingServiceIds = <String>{..._addingServiceIds, item.id};
+      _addErrorServiceIds = <String>{..._addErrorServiceIds}..remove(item.id);
+      _recentlyAddedServiceIds = <String>{..._recentlyAddedServiceIds}
+        ..remove(item.id);
     });
     final bool added = await _addServiceToCartUseCase(
       serviceId: item.id,
@@ -148,6 +166,10 @@ class _ClientHomeViewState extends State<ClientHomeView> {
       _addingServiceIds = <String>{..._addingServiceIds}..remove(item.id);
     });
     if (!added) {
+      setState(() {
+        _addErrorServiceIds = <String>{..._addErrorServiceIds, item.id};
+      });
+      _clearTransientAddState(item.id);
       ClientFeedback.showMessage(
         context,
         message: 'Este servicio ya está en el carrito.',
@@ -159,13 +181,30 @@ class _ClientHomeViewState extends State<ClientHomeView> {
 
     setState(() {
       _cartServiceIds = <String>{..._cartServiceIds, item.id};
+      _recentlyAddedServiceIds = <String>{..._recentlyAddedServiceIds, item.id};
+      _addErrorServiceIds = <String>{..._addErrorServiceIds}..remove(item.id);
     });
+    _clearTransientAddState(item.id);
     _tabUiStateService.setCartCount(_cartServiceIds.length);
     ClientFeedback.showMessage(
       context,
       message: 'Servicio agregado al carrito.',
     );
     HapticFeedback.lightImpact();
+  }
+
+  void _clearTransientAddState(String serviceId) {
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _recentlyAddedServiceIds = <String>{..._recentlyAddedServiceIds}
+          ..remove(serviceId);
+        _addErrorServiceIds = <String>{..._addErrorServiceIds}
+          ..remove(serviceId);
+      });
+    });
   }
 
   @override
@@ -186,10 +225,13 @@ class _ClientHomeViewState extends State<ClientHomeView> {
   }
 
   Widget _buildBody() {
-    final List<ClientServiceCategory> visibleCategories =
-        ClientServiceCategory.values.where((ClientServiceCategory category) {
-          return (_sections[category] ?? const <ClientServiceItem>[]).isNotEmpty;
-        }).toList();
+    final List<ClientServiceCategory> visibleCategories = ClientServiceCategory
+        .values
+        .where((ClientServiceCategory category) {
+          return (_sections[category] ?? const <ClientServiceItem>[])
+              .isNotEmpty;
+        })
+        .toList();
 
     if (_isLoading) {
       return const ClientStatusView.loading(
@@ -228,7 +270,11 @@ class _ClientHomeViewState extends State<ClientHomeView> {
                 services: _sections[category] ?? const <ClientServiceItem>[],
                 cartServiceIds: _cartServiceIds,
                 addingServiceIds: _addingServiceIds,
-                onAddService: _addService,
+                recentlyAddedServiceIds: _recentlyAddedServiceIds,
+                addErrorServiceIds: _addErrorServiceIds,
+                onAddService: (ClientServiceItem item) {
+                  return _addService(category: category, item: item);
+                },
                 onOpenCart: _goToCart,
                 onForbiddenImage: _refreshAfterImageForbidden,
               ),
@@ -245,6 +291,8 @@ class _ServiceCategorySection extends StatelessWidget {
     required this.services,
     required this.cartServiceIds,
     required this.addingServiceIds,
+    required this.recentlyAddedServiceIds,
+    required this.addErrorServiceIds,
     required this.onAddService,
     required this.onOpenCart,
     required this.onForbiddenImage,
@@ -254,7 +302,9 @@ class _ServiceCategorySection extends StatelessWidget {
   final List<ClientServiceItem> services;
   final Set<String> cartServiceIds;
   final Set<String> addingServiceIds;
-  final ValueChanged<ClientServiceItem> onAddService;
+  final Set<String> recentlyAddedServiceIds;
+  final Set<String> addErrorServiceIds;
+  final Future<void> Function(ClientServiceItem item) onAddService;
   final VoidCallback onOpenCart;
   final Future<void> Function() onForbiddenImage;
 
@@ -287,7 +337,7 @@ class _ServiceCategorySection extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             SizedBox(
-              height: 178,
+              height: 210,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: services.length,
@@ -300,6 +350,10 @@ class _ServiceCategorySection extends StatelessWidget {
                       item: item,
                       isAdded: cartServiceIds.contains(item.id),
                       isAdding: addingServiceIds.contains(item.id),
+                      hasRecentSuccess: recentlyAddedServiceIds.contains(
+                        item.id,
+                      ),
+                      hasAddError: addErrorServiceIds.contains(item.id),
                       onAdd: () => onAddService(item),
                       onOpenCart: onOpenCart,
                       onForbiddenImage: onForbiddenImage,
@@ -328,6 +382,8 @@ class _ServicePreviewCard extends StatelessWidget {
     required this.item,
     required this.isAdded,
     required this.isAdding,
+    required this.hasRecentSuccess,
+    required this.hasAddError,
     required this.onAdd,
     required this.onOpenCart,
     required this.onForbiddenImage,
@@ -337,6 +393,8 @@ class _ServicePreviewCard extends StatelessWidget {
   final ClientServiceItem item;
   final bool isAdded;
   final bool isAdding;
+  final bool hasRecentSuccess;
+  final bool hasAddError;
   final VoidCallback onAdd;
   final VoidCallback onOpenCart;
   final Future<void> Function() onForbiddenImage;
@@ -345,7 +403,7 @@ class _ServicePreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 228,
+      width: 236,
       child: Material(
         color: AppColors.cardAccent,
         borderRadius: BorderRadius.circular(18),
@@ -358,7 +416,7 @@ class _ServicePreviewCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 SizedBox(
-                  height: 64,
+                  height: 58,
                   width: double.infinity,
                   child: AppRemoteImage(
                     imageUrl: item.imageUrl,
@@ -375,32 +433,33 @@ class _ServicePreviewCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Hero(
                   tag: 'client-service-badge-${item.id}',
                   child: Material(
                     type: MaterialType.transparency,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.secondaryButton.withValues(
-                          alpha: 0.42,
-                        ),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        item.badge,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
+                    child: item.resolvedBadge.isEmpty
+                        ? const SizedBox.shrink()
+                        : Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondaryButton.withValues(
+                                alpha: 0.42,
+                              ),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              item.resolvedBadge,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -417,24 +476,20 @@ class _ServicePreviewCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item.cardSubtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
-                  item.priceLabel,
+                  item.resolvedPriceLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: AppColors.activeIcon,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.tonalIcon(
@@ -442,21 +497,44 @@ class _ServicePreviewCard extends StatelessWidget {
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
-                        vertical: 10,
+                        vertical: 8,
                       ),
+                      minimumSize: const Size.fromHeight(34),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       visualDensity: VisualDensity.compact,
                     ),
-                    icon: Icon(
-                      isAdded
-                          ? Icons.shopping_cart_checkout_rounded
-                          : isAdding
-                          ? Icons.hourglass_top_rounded
-                          : Icons.add_shopping_cart_rounded,
-                      size: 18,
+                    icon: TweenAnimationBuilder<double>(
+                      tween: Tween<double>(
+                        begin: 0,
+                        end: hasRecentSuccess ? 1 : 0,
+                      ),
+                      duration: const Duration(milliseconds: 380),
+                      curve: Curves.easeOutCubic,
+                      builder:
+                          (BuildContext context, double pulse, Widget? child) {
+                            final double scale =
+                                1 + (0.16 * (1 - (2 * pulse - 1).abs()));
+                            return Transform.scale(scale: scale, child: child);
+                          },
+                      child: Icon(
+                        hasAddError
+                            ? Icons.error_outline_rounded
+                            : hasRecentSuccess
+                            ? Icons.check_circle_rounded
+                            : isAdded
+                            ? Icons.shopping_cart_checkout_rounded
+                            : isAdding
+                            ? Icons.hourglass_top_rounded
+                            : Icons.add_shopping_cart_rounded,
+                        size: 18,
+                      ),
                     ),
                     label: Text(
-                      isAdded
+                      hasAddError
+                          ? 'Intenta de nuevo'
+                          : hasRecentSuccess
+                          ? 'Agregado'
+                          : isAdded
                           ? 'Ver carrito'
                           : isAdding
                           ? 'Agregando...'

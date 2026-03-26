@@ -9,11 +9,17 @@ class AddServiceToCartUseCase {
     required String serviceId,
     required String name,
     required int unitPriceCents,
+    String? productId,
+    String? productName,
+    List<String>? selectedProductIds,
   }) {
     return _repository.addService(
       serviceId: serviceId,
       name: name,
       unitPriceCents: unitPriceCents,
+      productId: productId,
+      productName: productName,
+      selectedProductIds: selectedProductIds,
     );
   }
 }

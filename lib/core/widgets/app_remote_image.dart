@@ -33,6 +33,14 @@ class _AppRemoteImageState extends State<AppRemoteImage> {
   bool _didHandleForbidden = false;
 
   @override
+  void didUpdateWidget(covariant AppRemoteImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl.trim() != widget.imageUrl.trim()) {
+      _didHandleForbidden = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final String rawImageUrl = widget.imageUrl.trim();
     final bool isLocalFile = _isLocalFilePath(rawImageUrl);

@@ -62,6 +62,13 @@ class _StatusPalette {
 
   factory _StatusPalette.fromStatus(ClientOrderStatus status) {
     switch (status) {
+      case ClientOrderStatus.pendingProviderApproval:
+        return _StatusPalette(
+          background: AppColors.secondaryButton.withValues(alpha: 0.2),
+          border: AppColors.secondaryText.withValues(alpha: 0.42),
+          foreground: AppColors.primaryText,
+          icon: Icons.pending_actions_rounded,
+        );
       case ClientOrderStatus.pendingPayment:
         return _StatusPalette(
           background: AppColors.primaryButton.withValues(alpha: 0.18),

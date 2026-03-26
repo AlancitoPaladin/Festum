@@ -36,10 +36,7 @@ class ManualBookingView extends StatelessWidget {
       ),
       builder: (context, model, child) => Scaffold(
         backgroundColor: AppColors.background,
-        appBar: CustomAppBar(
-          title: model.screenTitle,
-          showBackButton: true,
-        ),
+        appBar: CustomAppBar(title: model.screenTitle, showBackButton: true),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
@@ -74,10 +71,15 @@ class ManualBookingView extends StatelessWidget {
                     Icons.calendar_today_outlined,
                     () async {
                       final now = DateTime.now();
+                      final DateTime firstDate =
+                          model.selectedDate != null &&
+                              model.selectedDate!.isBefore(now)
+                          ? model.selectedDate!
+                          : now;
                       final date = await showDatePicker(
                         context: context,
                         initialDate: model.selectedDate ?? now,
-                        firstDate: now,
+                        firstDate: firstDate,
                         lastDate: now.add(const Duration(days: 365)),
                       );
                       if (date != null) {
@@ -298,7 +300,8 @@ class ManualBookingView extends StatelessWidget {
     }
 
     if (booking == null) {
-      final String message = model.errorMessage ??
+      final String message =
+          model.errorMessage ??
           (model.isEditMode
               ? 'No se pudo actualizar la reserva.'
               : 'No se pudo crear la reserva manual.');
@@ -311,9 +314,7 @@ class ManualBookingView extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          model.isEditMode
-              ? 'Reserva actualizada.'
-              : 'Reserva manual creada.',
+          model.isEditMode ? 'Reserva actualizada.' : 'Reserva manual creada.',
         ),
       ),
     );

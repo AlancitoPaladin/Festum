@@ -6,6 +6,7 @@ class ClientServiceItemDto {
     required this.id,
     required this.name,
     required this.subtitle,
+    required this.description,
     required this.priceLabel,
     required this.unitPriceCents,
     required this.badge,
@@ -20,6 +21,7 @@ class ClientServiceItemDto {
   final String id;
   final String name;
   final String subtitle;
+  final String description;
   final String priceLabel;
   final int unitPriceCents;
   final String badge;
@@ -31,6 +33,50 @@ class ClientServiceItemDto {
   final String? shortSubtitle;
 
   factory ClientServiceItemDto.fromJson(Map<String, dynamic> json) {
+    final String rawName = _readFirstString(json, const <String>[
+      'name',
+      'title',
+      'service_name',
+    ]);
+    final String rawSubtitle = _readFirstString(json, const <String>[
+      'subtitle',
+      'short_subtitle',
+      'summary',
+    ]);
+    final String rawDescription = _readFirstString(json, const <String>[
+      'description',
+      'details',
+      'long_description',
+    ]);
+    final String rawPriceLabel = _readFirstString(json, const <String>[
+      'price_label',
+      'priceLabel',
+      'starting_price_label',
+      'formatted_price',
+    ]);
+    final int rawUnitPriceCents = _readInt(json, const <String>[
+      'unit_price_cents',
+      'unitPriceCents',
+      'price_cents',
+      'min_price_cents',
+      'amount_cents',
+    ]);
+    final double rawPrice = _readDouble(json, const <String>[
+      'price',
+      'amount',
+    ]);
+
+    String resolvedName = rawName;
+    if (_looksLikePriceHint(resolvedName) &&
+        _readFirstString(json, const <String>['title']).trim().isNotEmpty) {
+      resolvedName = _readFirstString(json, const <String>['title']);
+    }
+    if (_looksLikePriceHint(resolvedName) &&
+        rawSubtitle.trim().isNotEmpty &&
+        !_looksLikePriceHint(rawSubtitle)) {
+      resolvedName = rawSubtitle;
+    }
+
     final Map<String, dynamic>? imagePayload = _asMap(json['image']);
     final String imageKey = (imagePayload?['key'] ?? json['image_key'] ?? '')
         .toString()
@@ -56,21 +102,22 @@ class ClientServiceItemDto {
 
     return ClientServiceItemDto(
       id: json['id'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      subtitle: json['subtitle'] as String? ?? '',
-      priceLabel: json['price_label'] as String? ?? '',
-      unitPriceCents: (json['unit_price_cents'] as num?)?.toInt() ?? 0,
+      name: resolvedName,
+      subtitle: rawSubtitle,
+      description: rawDescription,
+      priceLabel: rawPriceLabel,
+      unitPriceCents: rawUnitPriceCents > 0
+          ? rawUnitPriceCents
+          : (rawPrice > 0 ? (rawPrice * 100).round() : 0),
       badge: json['badge'] as String? ?? '',
-      products:
-          ((json['products'] as List<dynamic>? ?? <dynamic>[])
-              .whereType<Map<dynamic, dynamic>>()
-              .map(
-                (Map<dynamic, dynamic> item) =>
-                    ClientServiceProductDto.fromJson(
-                      Map<String, dynamic>.from(item),
-                    ),
-              )
-              .toList()),
+      products: ((json['products'] as List<dynamic>? ?? <dynamic>[])
+          .whereType<Map<dynamic, dynamic>>()
+          .map(
+            (Map<dynamic, dynamic> item) => ClientServiceProductDto.fromJson(
+              Map<String, dynamic>.from(item),
+            ),
+          )
+          .toList()),
       imageKey: imageKey,
       imageUrl: imageUrl,
       imageExpiresAt: imageExpiresAt,
@@ -84,6 +131,7 @@ class ClientServiceItemDto {
       'id': id,
       'name': name,
       'subtitle': subtitle,
+      'description': description,
       'price_label': priceLabel,
       'unit_price_cents': unitPriceCents,
       'badge': badge,
@@ -107,6 +155,7 @@ class ClientServiceItemDto {
       id: id,
       name: name,
       subtitle: subtitle,
+      description: description,
       priceLabel: priceLabel,
       unitPriceCents: unitPriceCents,
       badge: badge,
@@ -136,6 +185,67 @@ class ClientServiceItemDto {
       return null;
     }
     return DateTime.tryParse(value.trim())?.toUtc();
+  }
+
+  static String _readFirstString(Map<String, dynamic> json, List<String> keys) {
+    for (final String key in keys) {
+      final String value = (json[key] ?? '').toString().trim();
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+    return '';
+  }
+
+  static bool _looksLikePriceHint(String value) {
+    final String normalized = value.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return false;
+    }
+    return normalized == 'cotiza' ||
+        normalized == 'cotizar' ||
+        normalized == 'precio por definir' ||
+        normalized.startsWith('desde ') ||
+        normalized.contains('mxn') ||
+        normalized.contains('\$');
+  }
+
+  static int _readInt(Map<String, dynamic> json, List<String> keys) {
+    for (final String key in keys) {
+      final dynamic value = json[key];
+      if (value == null) {
+        continue;
+      }
+      if (value is int) {
+        return value;
+      }
+      if (value is num) {
+        return value.toInt();
+      }
+      final int? parsed = int.tryParse(value.toString().trim());
+      if (parsed != null) {
+        return parsed;
+      }
+    }
+    return 0;
+  }
+
+  static double _readDouble(Map<String, dynamic> json, List<String> keys) {
+    for (final String key in keys) {
+      final dynamic value = json[key];
+      if (value == null) {
+        continue;
+      }
+      if (value is num) {
+        return value.toDouble();
+      }
+      final String raw = value.toString().trim().replaceAll(',', '.');
+      final double? parsed = double.tryParse(raw);
+      if (parsed != null) {
+        return parsed;
+      }
+    }
+    return 0;
   }
 }
 
@@ -168,8 +278,9 @@ class ClientServiceProductDto {
     final Map<String, dynamic>? imagePayload = ClientServiceItemDto._asMap(
       json['image'],
     );
-    final String imageKey =
-        (imagePayload?['key'] ?? json['image_key'] ?? '').toString().trim();
+    final String imageKey = (imagePayload?['key'] ?? json['image_key'] ?? '')
+        .toString()
+        .trim();
     final String imageUrl = resolveImageUrlFromJson(
       json,
       directKeys: const <String>['main_image_url', 'image_url', 'url'],

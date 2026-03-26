@@ -37,6 +37,8 @@ class _ClientCartViewState extends State<ClientCartView> {
   bool _isCheckingOut = false;
   String? _errorMessage;
   List<ClientCartItem> _cartItems = <ClientCartItem>[];
+  DateTime? _requestedEventDate;
+  String _requestNotes = '';
 
   @override
   void initState() {
@@ -163,6 +165,10 @@ class _ClientCartViewState extends State<ClientCartView> {
       return;
     }
 
+    DateTime selectedDate =
+        _requestedEventDate ?? DateTime.now().add(const Duration(days: 7));
+    String notesValue = _requestNotes;
+
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -173,70 +179,148 @@ class _ClientCartViewState extends State<ClientCartView> {
       ),
       builder: (BuildContext context) {
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Confirmar orden',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Revisa el resumen antes de continuar con el pago.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                _SummaryRow(
-                  label: 'Subtotal',
-                  value: _formatCurrency(totals.subtotal),
-                ),
-                _SummaryRow(
-                  label: 'Cargo de servicio (5%)',
-                  value: _formatCurrency(totals.serviceFee),
-                ),
-                _SummaryRow(
-                  label: 'Impuestos (16%)',
-                  value: _formatCurrency(totals.tax),
-                ),
-                const Divider(height: 20),
-                _SummaryRow(
-                  label: 'Total estimado',
-                  value: _formatCurrency(totals.total),
-                  emphasis: true,
-                ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isCheckingOut
-                        ? null
-                        : () async {
-                            Navigator.of(context).pop();
-                            await _confirmCheckout();
-                          },
-                    child: _isCheckingOut
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Confirmar y continuar'),
+          child: AnimatedPadding(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              24 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Confirmar orden',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: _isCheckingOut
-                        ? null
-                        : () => Navigator.of(context).pop(),
-                    child: const Text('Seguir editando'),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Revisa el resumen antes de continuar con el pago.',
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'Fecha del evento',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  StatefulBuilder(
+                    builder: (BuildContext context, StateSetter setModalState) {
+                      return OutlinedButton.icon(
+                        onPressed: _isCheckingOut
+                            ? null
+                            : () async {
+                                final DateTime now = DateTime.now();
+                                final DateTime? picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: selectedDate.isBefore(now)
+                                      ? now
+                                      : selectedDate,
+                                  firstDate: DateTime(
+                                    now.year,
+                                    now.month,
+                                    now.day,
+                                  ),
+                                  lastDate: now.add(
+                                    const Duration(days: 365 * 2),
+                                  ),
+                                );
+                                if (picked == null) {
+                                  return;
+                                }
+                                setModalState(() => selectedDate = picked);
+                              },
+                        icon: const Icon(Icons.event_rounded),
+                        label: Text(_formatDate(selectedDate)),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: notesValue,
+                    maxLines: 2,
+                    textInputAction: TextInputAction.done,
+                    onChanged: (String value) => notesValue = value,
+                    decoration: const InputDecoration(
+                      labelText: 'Notas para el proveedor (opcional)',
+                      hintText: 'Ej. Horario preferido, tipo de evento...',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Elementos',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 10),
+                  ..._cartItems.map((ClientCartItem item) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _CheckoutItemRow(
+                        title: item.resolvedServiceName,
+                        subtitle: item.resolvedProductName,
+                        amount: _formatCurrency(item.unitPriceCents),
+                      ),
+                    );
+                  }),
+                  const Divider(height: 20),
+                  _SummaryRow(
+                    label: 'Subtotal',
+                    value: _formatCurrency(totals.subtotal),
+                  ),
+                  _SummaryRow(
+                    label: 'Cargo de servicio (5%)',
+                    value: _formatCurrency(totals.serviceFee),
+                  ),
+                  _SummaryRow(
+                    label: 'Impuestos (16%)',
+                    value: _formatCurrency(totals.tax),
+                  ),
+                  const Divider(height: 20),
+                  _SummaryRow(
+                    label: 'Total estimado',
+                    value: _formatCurrency(totals.total),
+                    emphasis: true,
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isCheckingOut
+                          ? null
+                          : () async {
+                              _requestedEventDate = selectedDate;
+                              _requestNotes = notesValue.trim();
+                              Navigator.of(context).pop();
+                              await _confirmCheckout(
+                                eventDate: selectedDate,
+                                notes: _requestNotes,
+                              );
+                            },
+                      child: _isCheckingOut
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Confirmar y continuar'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _isCheckingOut
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      child: const Text('Seguir editando'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -244,13 +328,19 @@ class _ClientCartViewState extends State<ClientCartView> {
     );
   }
 
-  Future<void> _confirmCheckout() async {
+  Future<void> _confirmCheckout({
+    required DateTime eventDate,
+    String? notes,
+  }) async {
     if (_isCheckingOut) {
       return;
     }
 
     setState(() => _isCheckingOut = true);
-    final createdOrder = await _checkoutCartUseCase();
+    final createdOrder = await _checkoutCartUseCase(
+      eventDate: eventDate,
+      notes: notes,
+    );
     if (!mounted) {
       return;
     }
@@ -287,6 +377,13 @@ class _ClientCartViewState extends State<ClientCartView> {
         totalLabel: createdOrder.totalLabel,
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final String day = date.day.toString().padLeft(2, '0');
+    final String month = date.month.toString().padLeft(2, '0');
+    final String year = date.year.toString();
+    return '$day/$month/$year';
   }
 
   _CartTotals _calculateTotals() {
@@ -428,9 +525,11 @@ class _ClientCartViewState extends State<ClientCartView> {
           child: Card(
             child: ListTile(
               leading: const Icon(Icons.shopping_bag_rounded),
-              title: Text(item.name),
+              title: Text(item.resolvedServiceName),
               subtitle: Text(
-                'Cantidad: 1 • ${_formatCurrency(item.unitPriceCents)}',
+                item.resolvedProductName == null
+                    ? 'Cantidad: 1 • ${_formatCurrency(item.unitPriceCents)}'
+                    : '${item.resolvedProductName} • ${_formatCurrency(item.unitPriceCents)}',
               ),
               trailing: IconButton(
                 tooltip: 'Eliminar',
@@ -496,6 +595,49 @@ class _SummaryRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CheckoutItemRow extends StatelessWidget {
+  const _CheckoutItemRow({
+    required this.title,
+    required this.amount,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final String amount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              if (subtitle != null && subtitle!.trim().isNotEmpty)
+                Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          amount,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ],
     );
   }
 }

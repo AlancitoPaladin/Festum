@@ -35,14 +35,31 @@ class ApiClientCartRepository implements ClientCartRepository {
     required String serviceId,
     required String name,
     required int unitPriceCents,
+    String? productId,
+    String? productName,
+    List<String>? selectedProductIds,
   }) async {
     try {
       return await _apiClient.addServiceToClientCart(
         serviceId: serviceId,
         name: name,
         unitPriceCents: unitPriceCents,
+        productId: productId,
+        productName: productName,
+        selectedProductIds: selectedProductIds,
       );
     } on DioException catch (error) {
+      if (error.response?.statusCode == 422 &&
+          selectedProductIds != null &&
+          selectedProductIds.isNotEmpty) {
+        return _apiClient.addServiceToClientCart(
+          serviceId: serviceId,
+          name: name,
+          unitPriceCents: unitPriceCents,
+          productId: productId,
+          productName: productName,
+        );
+      }
       // Duplicate service in cart should be a controlled UI case, not a hard failure.
       if (error.response?.statusCode == 409) {
         return false;

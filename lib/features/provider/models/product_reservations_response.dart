@@ -11,6 +11,7 @@ class ProductReservationSummary {
     required this.category,
     required this.imageUrl,
     required this.nextBooking,
+    required this.reservationsCount,
   });
 
   final String id;
@@ -19,6 +20,7 @@ class ProductReservationSummary {
   final ServiceCategory category;
   final String imageUrl;
   final Booking? nextBooking;
+  final int reservationsCount;
 
   factory ProductReservationSummary.fromJson(Map<String, dynamic> json) {
     return ProductReservationSummary(
@@ -30,10 +32,7 @@ class ProductReservationSummary {
       ),
       imageUrl: _resolveImageUrl(
         json,
-        directKeys: const <String>[
-          'image_url',
-          'main_image_url',
-        ],
+        directKeys: const <String>['image_url', 'main_image_url'],
         objectKeys: const <String>['image', 'main_image'],
         listKeys: const <String>['images', 'image_urls'],
       ),
@@ -42,6 +41,11 @@ class ProductReservationSummary {
               Map<String, dynamic>.from(json['next_booking'] as Map),
             )
           : null,
+      reservationsCount: _toInt(
+        json['reservations_count'] ??
+            json['bookings_count'] ??
+            json['reservations'],
+      ),
     );
   }
 
@@ -53,38 +57,36 @@ class ProductReservationSummary {
       'category': category.name,
       'image_url': imageUrl,
       'next_booking': nextBooking?.toJson(),
+      'reservations_count': reservationsCount,
     };
   }
 }
 
 class ProductReservationsResponse {
-  const ProductReservationsResponse({
-    required this.items,
-    required this.total,
-  });
+  const ProductReservationsResponse({required this.items, required this.total});
 
   final List<ProductReservationSummary> items;
   final int total;
 
   factory ProductReservationsResponse.fromJson(Map<String, dynamic> json) {
     return ProductReservationsResponse(
-      items:
-          ((json['items'] as List<dynamic>? ?? <dynamic>[])
-              .whereType<Map<dynamic, dynamic>>()
-              .map(
-                (Map<dynamic, dynamic> item) =>
-                    ProductReservationSummary.fromJson(
-                      Map<String, dynamic>.from(item),
-                    ),
-              )
-              .toList()),
+      items: ((json['items'] as List<dynamic>? ?? <dynamic>[])
+          .whereType<Map<dynamic, dynamic>>()
+          .map(
+            (Map<dynamic, dynamic> item) => ProductReservationSummary.fromJson(
+              Map<String, dynamic>.from(item),
+            ),
+          )
+          .toList()),
       total: _toInt(json['total']),
     );
   }
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
-      'items': items.map((ProductReservationSummary item) => item.toJson()).toList(),
+      'items': items
+          .map((ProductReservationSummary item) => item.toJson())
+          .toList(),
       'total': total,
     };
   }

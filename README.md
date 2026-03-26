@@ -29,15 +29,56 @@ Festum is a Flutter application for event services discovery and booking. It pro
 
 ## Configuration
 
-Optional environment variable:
+Supported `--dart-define` values:
 
-- `API_BASE_URL` (debug default: `http://127.0.0.1:8000`).
+- `APP_ENV`: `dev` | `staging` | `prod`
+- `API_BASE_URL`: URL override for any environment
+- `USE_CLIENT_MOCKS`: `true` | `false`
 
-Example:
+Resolution order:
+
+1. `API_BASE_URL` (highest priority)
+2. `APP_ENV`
+3. Local defaults (`dev`):
+   - Android emulator: `http://10.0.2.2:8000`
+   - iOS simulator/macOS: `http://127.0.0.1:8000`
+
+Environment defaults:
+
+- `APP_ENV=dev` -> local defaults
+- `APP_ENV=staging` -> `https://staging-api.example.com`
+- `APP_ENV=prod` -> `https://api.example.com`
+
+Useful examples:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
+# Android emulator + local API
+flutter run --dart-define=APP_ENV=dev --dart-define=API_BASE_URL=http://10.0.2.2:8000
+
+# iOS simulator + local API
+flutter run --dart-define=APP_ENV=dev --dart-define=API_BASE_URL=http://127.0.0.1:8000
+
+# Device (Android/iOS) + cloud API
+flutter run --dart-define=APP_ENV=prod --dart-define=API_BASE_URL=https://api.tudominio.com
+
+# Force real API (no mocks)
+flutter run --dart-define=APP_ENV=dev --dart-define=USE_CLIENT_MOCKS=false
 ```
+
+### iOS Xcode (sin `--dart-define`)
+
+El proyecto ya incluye defines por configuración:
+
+- `Debug` -> `APP_ENV=dev`, `USE_CLIENT_MOCKS=false`
+- `Release/Profile` -> `APP_ENV=prod`, `USE_CLIENT_MOCKS=false`
+
+En Xcode:
+
+1. `Product -> Scheme -> Edit Scheme...`
+2. Para `Run` usa `Build Configuration: Debug`.
+3. Para `Archive` usa `Build Configuration: Release`.
+4. Para pruebas contra staging, usa `Build Configuration: Staging` en `Run` o `Archive`.
+5. También puedes seleccionar el scheme compartido `Runner-Staging` para no cambiar la configuración manualmente.
 
 ## Run
 

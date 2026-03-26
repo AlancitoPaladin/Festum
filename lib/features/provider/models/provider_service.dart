@@ -20,6 +20,7 @@ class ProviderService {
     required this.image,
     required this.images,
     required this.legacyImageUrl,
+    required this.rawCategory,
   });
 
   final String id;
@@ -36,6 +37,7 @@ class ProviderService {
   final ProviderSignedAsset? image;
   final List<ProviderServiceImage> images;
   final String legacyImageUrl;
+  final String rawCategory;
 
   String get normalizedStatus {
     switch (status.trim().toLowerCase()) {
@@ -53,6 +55,8 @@ class ProviderService {
   bool get isPublished => normalizedStatus == 'published';
   bool get isInactive => normalizedStatus == 'inactive';
   bool get isDraft => normalizedStatus == 'draft';
+  bool get hasUnknownCategory =>
+      ServiceCategory.tryFromProviderApiValue(rawCategory) == null;
 
   String get resolvedImageUrl {
     ProviderServiceImage? mainImage;
@@ -65,12 +69,18 @@ class ProviderService {
     final String imageUrl = sanitizeAssetUrl(
       mainImage?.resolvedImageUrl.isNotEmpty == true
           ? mainImage!.resolvedImageUrl
-          : (image?.url.trim().isNotEmpty == true ? image!.url : legacyImageUrl),
+          : (image?.url.trim().isNotEmpty == true
+                ? image!.url
+                : legacyImageUrl),
     );
     return imageUrl;
   }
 
   factory ProviderService.fromJson(Map<String, dynamic> json) {
+    final String rawCategory = (json['category'] ?? '').toString();
+    final ServiceCategory resolvedCategory =
+        ServiceCategory.tryFromProviderApiValue(rawCategory) ??
+        ServiceCategory.dj;
     final Map<String, dynamic>? imagePayload = _asMap(json['image']);
     final String mainImageKey =
         (imagePayload?['key'] ?? json['main_image_key'] ?? '').toString();
@@ -88,9 +98,7 @@ class ProviderService {
     );
     return ProviderService(
       id: (json['id'] ?? '').toString(),
-      category: ServiceCategory.fromProviderApiValue(
-        (json['category'] ?? '').toString(),
-      ),
+      category: resolvedCategory,
       name: (json['name'] ?? '').toString(),
       subtitle: (json['subtitle'] ?? '').toString(),
       description: (json['description'] ?? '').toString(),
@@ -99,16 +107,16 @@ class ProviderService {
       badge: (json['badge'] ?? '').toString(),
       status: (json['status'] ?? 'draft').toString(),
       mainImageKey: mainImageKey,
-      imageKeys:
-          ((json['image_keys'] as List<dynamic>? ?? <dynamic>[])
-              .map((dynamic item) => item.toString().trim())
-              .where((String item) => item.isNotEmpty)
-              .toList()),
+      imageKeys: ((json['image_keys'] as List<dynamic>? ?? <dynamic>[])
+          .map((dynamic item) => item.toString().trim())
+          .where((String item) => item.isNotEmpty)
+          .toList()),
       image: imagePayload == null
           ? null
           : ProviderSignedAsset.fromJson(imagePayload),
       images: images,
       legacyImageUrl: legacyImageUrl,
+      rawCategory: rawCategory,
     );
   }
 
@@ -127,6 +135,7 @@ class ProviderService {
     ProviderSignedAsset? image,
     List<ProviderServiceImage>? images,
     String? legacyImageUrl,
+    String? rawCategory,
   }) {
     return ProviderService(
       id: id ?? this.id,
@@ -143,6 +152,7 @@ class ProviderService {
       image: image ?? this.image,
       images: images ?? this.images,
       legacyImageUrl: legacyImageUrl ?? this.legacyImageUrl,
+      rawCategory: rawCategory ?? this.rawCategory,
     );
   }
 
@@ -176,7 +186,9 @@ class ProviderService {
             ),
           );
         } else if (item is Map) {
-          final Map<String, dynamic> normalized = Map<String, dynamic>.from(item);
+          final Map<String, dynamic> normalized = Map<String, dynamic>.from(
+            item,
+          );
           parsed.add(
             ProviderServiceImage.fromJson(
               normalized,
@@ -200,13 +212,10 @@ class ProviderService {
         continue;
       }
       parsed.add(
-        ProviderServiceImage.fromJson(
-          <String, dynamic>{
-            'key': imageKey,
-            'is_main': imageKey == mainImageKey,
-          },
-          fallbackIsMain: imageKey == mainImageKey,
-        ),
+        ProviderServiceImage.fromJson(<String, dynamic>{
+          'key': imageKey,
+          'is_main': imageKey == mainImageKey,
+        }, fallbackIsMain: imageKey == mainImageKey),
       );
     }
 
@@ -220,15 +229,12 @@ class ProviderService {
       if (!alreadyIncluded) {
         parsed.insert(
           0,
-          ProviderServiceImage.fromJson(
-            <String, dynamic>{
-              'key': fallbackKey,
-              'image': imagePayload,
-              'image_url': legacyImageUrl,
-              'is_main': true,
-            },
-            fallbackIsMain: true,
-          ),
+          ProviderServiceImage.fromJson(<String, dynamic>{
+            'key': fallbackKey,
+            'image': imagePayload,
+            'image_url': legacyImageUrl,
+            'is_main': true,
+          }, fallbackIsMain: true),
         );
       }
     }
@@ -263,24 +269,20 @@ class ProviderService {
 }
 
 class ProviderServicesResponse {
-  const ProviderServicesResponse({
-    required this.items,
-    required this.total,
-  });
+  const ProviderServicesResponse({required this.items, required this.total});
 
   final List<ProviderService> items;
   final int total;
 
   factory ProviderServicesResponse.fromJson(Map<String, dynamic> json) {
     return ProviderServicesResponse(
-      items:
-          ((json['items'] as List<dynamic>? ?? <dynamic>[])
-              .whereType<Map<dynamic, dynamic>>()
-              .map(
-                (Map<dynamic, dynamic> item) =>
-                    ProviderService.fromJson(Map<String, dynamic>.from(item)),
-              )
-              .toList()),
+      items: ((json['items'] as List<dynamic>? ?? <dynamic>[])
+          .whereType<Map<dynamic, dynamic>>()
+          .map(
+            (Map<dynamic, dynamic> item) =>
+                ProviderService.fromJson(Map<String, dynamic>.from(item)),
+          )
+          .toList()),
       total: _toInt(json['total']),
     );
   }

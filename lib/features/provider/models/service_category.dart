@@ -32,7 +32,7 @@ enum ServiceCategory {
     }
   }
 
-  static ServiceCategory fromProviderApiValue(String value) {
+  static ServiceCategory? tryFromProviderApiValue(String value) {
     switch (value.trim().toLowerCase()) {
       case 'salones-sociales':
       case 'venue':
@@ -55,10 +55,23 @@ enum ServiceCategory {
       case 'entertainment':
         return ServiceCategory.entertainment;
       case 'dj':
-      default:
         return ServiceCategory.dj;
+      default:
+        return null;
     }
   }
 
-  static const List<ServiceCategory> providerServiceOptions = values;
+  static ServiceCategory fromProviderApiValue(String value) {
+    return tryFromProviderApiValue(value) ?? ServiceCategory.dj;
+  }
+
+  static const List<ServiceCategory> providerServiceOptions = <ServiceCategory>[
+    ServiceCategory.dj,
+    ServiceCategory.banquet,
+    ServiceCategory.furniture,
+    ServiceCategory.venue,
+    ServiceCategory.decoration,
+    ServiceCategory.photography,
+    ServiceCategory.entertainment,
+  ];
 }

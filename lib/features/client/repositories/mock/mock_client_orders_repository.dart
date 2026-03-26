@@ -1,4 +1,5 @@
 import 'package:festum/features/client/models/client_order_item.dart';
+import 'package:festum/features/client/models/client_cart_item.dart';
 import 'package:festum/features/client/repositories/client_orders_repository.dart';
 
 class MockClientOrdersRepository implements ClientOrdersRepository {
@@ -42,6 +43,43 @@ class MockClientOrdersRepository implements ClientOrdersRepository {
       title: title,
       status: status,
       totalLabel: totalLabel,
+    );
+    _orders.insert(0, created);
+    return created;
+  }
+
+  @override
+  Future<ClientOrderItem> checkoutCart() async {
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    final int sequence = 3200 + _orders.length + 1;
+    final ClientOrderItem created = ClientOrderItem(
+      id: 'FST-$sequence',
+      title: 'Nueva orden',
+      status: ClientOrderStatus.pendingPayment,
+      totalLabel: '\$0 MXN',
+    );
+    _orders.insert(0, created);
+    return created;
+  }
+
+  @override
+  Future<ClientOrderItem> submitOrderRequest({
+    required List<ClientCartItem> items,
+    required DateTime eventDate,
+    String? notes,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    final int sequence = 4200 + _orders.length + 1;
+    final String title = items.isEmpty
+        ? 'Nueva solicitud'
+        : items.length == 1
+        ? items.first.resolvedServiceName
+        : '${items.first.resolvedServiceName} +${items.length - 1} servicios';
+    final ClientOrderItem created = ClientOrderItem(
+      id: 'FST-$sequence',
+      title: title,
+      status: ClientOrderStatus.pendingPayment,
+      totalLabel: '\$0 MXN',
     );
     _orders.insert(0, created);
     return created;

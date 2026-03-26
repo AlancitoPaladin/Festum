@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/theme/app_colors.dart';
@@ -172,7 +173,11 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
             child: Card(
               child: ListTile(
                 leading: const Icon(Icons.receipt_long_rounded),
-                title: Text('Orden #${order.id} - ${order.title}'),
+                title: Text(
+                  'Orden #${order.id} - ${order.title}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 subtitle: Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Column(
@@ -181,7 +186,11 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
                     children: <Widget>[
                       OrderStatusChip(status: order.status),
                       const SizedBox(height: 6),
-                      Text('Total: ${order.totalLabel}'),
+                      Text(
+                        'Total: ${_resolvedPayableLabel(order)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
@@ -241,16 +250,35 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                _OrderMetaRow(label: 'Total estimado', value: order.totalLabel),
+                _OrderMetaRow(
+                  label: 'Total estimado',
+                  value: _resolvedPayableLabel(order),
+                ),
+                if (order.subtotalCents != null) ...<Widget>[
+                  _OrderMetaRow(
+                    label: 'Subtotal',
+                    value: _formatCurrency(order.subtotalCents!),
+                  ),
+                ],
+                if (order.serviceFeeCents != null) ...<Widget>[
+                  _OrderMetaRow(
+                    label: 'Cargo de servicio',
+                    value: _formatCurrency(order.serviceFeeCents!),
+                  ),
+                ],
+                if (order.taxCents != null) ...<Widget>[
+                  _OrderMetaRow(
+                    label: 'Impuestos',
+                    value: _formatCurrency(order.taxCents!),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Text(
                   'Servicios incluidos',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                _ServiceChip(label: order.title),
-                _ServiceChip(label: 'Coordinacion y montaje'),
-                _ServiceChip(label: 'Soporte en evento'),
+                _buildOrderItemsSection(order),
                 const SizedBox(height: 16),
                 Text(
                   'Timeline',
@@ -298,30 +326,49 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
 
   Future<void> _handlePrimaryAction(ClientOrderItem order) async {
     Navigator.of(context).pop();
-    switch (order.status) {
+    final ClientOrderItem current = await _refreshOrderSnapshot(order);
+    if (!mounted) {
+      return;
+    }
+    switch (current.status) {
+      case ClientOrderStatus.pendingProviderApproval:
+        ClientFeedback.showMessage(
+          context,
+          message:
+              'Tu solicitud está pendiente de aprobación del proveedor. Te notificaremos en cuanto responda.',
+        );
+        return;
       case ClientOrderStatus.pendingPayment:
-        final bool? paid = await _showPaymentSheet(order);
+        final bool? paid = await _showPaymentSheet(current);
         if (paid == true) {
           await _transitionOrderStatus(
-            order: order,
+            order: current,
             target: ClientOrderStatus.confirmed,
             successMessage: 'Pago confirmado. Tu orden ahora está confirmada.',
           );
         }
         return;
       case ClientOrderStatus.confirmed:
-        await _showContractSummarySheet(order);
+        final bool? paid = await _showPaymentSheet(current);
+        if (paid == true) {
+          await _transitionOrderStatus(
+            order: current,
+            target: ClientOrderStatus.inProgress,
+            successMessage: 'Pago confirmado. Tu orden ahora está en proceso.',
+          );
+        }
         return;
       case ClientOrderStatus.inProgress:
-        await _showProviderContactSheet(order);
+        await _showProviderContactSheet(current);
         return;
       case ClientOrderStatus.completed:
-        await _showRatingSheet(order);
+        await _showRatingSheet(current);
         return;
       case ClientOrderStatus.cancelled:
         ClientFeedback.showMessage(
           context,
-          message: 'Esta orden está cancelada y no admite acciones.',
+          message:
+              'Esta orden ya está cancelada (o fue rechazada por el proveedor).',
         );
         return;
     }
@@ -340,15 +387,51 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
       return;
     }
 
-    await _updateClientOrderStatusUseCase(orderId: order.id, status: target);
-    if (!mounted) {
-      return;
+    try {
+      await _updateClientOrderStatusUseCase(orderId: order.id, status: target);
+      if (!mounted) {
+        return;
+      }
+      await _loadOrders(showLoader: false);
+      if (!mounted) {
+        return;
+      }
+      ClientFeedback.showMessage(context, message: successMessage);
+    } on DioException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      final int? statusCode = error.response?.statusCode;
+      if (statusCode == 409) {
+        ClientFeedback.showMessage(
+          context,
+          message:
+              'La orden cambió de estado y ya no se puede aplicar esta acción.',
+        );
+        await _loadOrders(showLoader: false);
+        return;
+      }
+      if (statusCode == 500) {
+        ClientFeedback.showMessage(
+          context,
+          message:
+              'No se pudo actualizar la orden por un error del servidor. Intenta nuevamente.',
+        );
+        return;
+      }
+      ClientFeedback.showMessage(
+        context,
+        message: 'No se pudo actualizar la orden. Verifica tu conexión.',
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ClientFeedback.showMessage(
+        context,
+        message: 'Ocurrió un error inesperado al actualizar la orden.',
+      );
     }
-    await _loadOrders(showLoader: false);
-    if (!mounted) {
-      return;
-    }
-    ClientFeedback.showMessage(context, message: successMessage);
   }
 
   Future<void> _confirmCancelOrder(ClientOrderItem order) async {
@@ -381,10 +464,112 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
       return;
     }
     Navigator.of(context).pop();
+    final ClientOrderItem current = await _refreshOrderSnapshot(order);
+    if (!mounted) {
+      return;
+    }
+    if (!current.status.canTransitionTo(ClientOrderStatus.cancelled)) {
+      ClientFeedback.showMessage(
+        context,
+        message:
+            'La orden ya cambió de estado y no se puede cancelar desde aquí.',
+      );
+      return;
+    }
     await _transitionOrderStatus(
-      order: order,
+      order: current,
       target: ClientOrderStatus.cancelled,
       successMessage: 'Tu orden fue cancelada correctamente.',
+    );
+  }
+
+  Future<ClientOrderItem> _refreshOrderSnapshot(
+    ClientOrderItem fallback,
+  ) async {
+    try {
+      final List<ClientOrderItem> latest = await _getClientOrdersUseCase();
+      if (!mounted) {
+        return fallback;
+      }
+      ClientOrderItem? current;
+      for (final ClientOrderItem item in latest) {
+        if (item.id == fallback.id) {
+          current = item;
+          break;
+        }
+      }
+      setState(() {
+        _orders = latest;
+        _errorMessage = null;
+      });
+      _tabUiStateService.setOrdersCount(latest.length);
+      return current ?? fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  Widget _buildOrderItemsSection(ClientOrderItem order) {
+    if (order.items.isEmpty) {
+      return _ServiceChip(label: order.title);
+    }
+
+    return Column(
+      children: order.items.map((ClientOrderLineItem item) {
+        final List<String> selectedNames = item.selectedProducts
+            .map((ClientOrderSelectedProduct product) => product.name.trim())
+            .where((String value) => value.isNotEmpty)
+            .toList();
+        final int? lineTotal = item.totalItemCents ?? item.unitPriceCents;
+        final String serviceName = item.serviceName.trim().isEmpty
+            ? order.title
+            : item.serviceName;
+
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.fieldBackground,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.outline.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                serviceName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              if ((item.productName ?? '').trim().isNotEmpty) ...<Widget>[
+                const SizedBox(height: 4),
+                Text(
+                  'Producto: ${item.productName}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              if (selectedNames.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 4),
+                Text(
+                  'Seleccionados: ${selectedNames.join(', ')}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              if (lineTotal != null && lineTotal > 0) ...<Widget>[
+                const SizedBox(height: 6),
+                Text(
+                  'Total ítem: ${_formatCurrency(lineTotal)}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -414,7 +599,7 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Orden #${order.id} • ${order.totalLabel}',
+                      'Orden #${order.id} • ${_resolvedPayableLabel(order)}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.secondaryText,
                       ),
@@ -457,46 +642,6 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
               ),
             );
           },
-        );
-      },
-    );
-  }
-
-  Future<void> _showContractSummarySheet(ClientOrderItem order) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      backgroundColor: AppColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Resumen del contrato',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Orden #${order.id}\nServicio: ${order.title}\nTotal: ${order.totalLabel}',
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cerrar'),
-                  ),
-                ),
-              ],
-            ),
-          ),
         );
       },
     );
@@ -620,6 +765,12 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
 
   _OrderPrimaryAction _primaryActionFor(ClientOrderStatus status) {
     switch (status) {
+      case ClientOrderStatus.pendingProviderApproval:
+        return const _OrderPrimaryAction(
+          label: 'Esperando aprobación',
+          icon: Icons.pending_actions_rounded,
+          enabled: false,
+        );
       case ClientOrderStatus.pendingPayment:
         return const _OrderPrimaryAction(
           label: 'Pagar ahora',
@@ -628,8 +779,8 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
         );
       case ClientOrderStatus.confirmed:
         return const _OrderPrimaryAction(
-          label: 'Ver detalles',
-          icon: Icons.description_outlined,
+          label: 'Pagar ahora',
+          icon: Icons.credit_card_rounded,
           enabled: true,
         );
       case ClientOrderStatus.inProgress:
@@ -651,6 +802,28 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
           enabled: false,
         );
     }
+  }
+
+  String _resolvedPayableLabel(ClientOrderItem order) {
+    final int? totalCents = order.totalCents;
+    if (totalCents == null || totalCents <= 0) {
+      return order.totalLabel;
+    }
+    return _formatCurrency(totalCents);
+  }
+
+  String _formatCurrency(int cents) {
+    final int pesos = (cents / 100).round();
+    final String raw = pesos.toString();
+    final StringBuffer buffer = StringBuffer();
+    for (int i = 0; i < raw.length; i++) {
+      final int position = raw.length - i;
+      buffer.write(raw[i]);
+      if (position > 1 && position % 3 == 1) {
+        buffer.write(',');
+      }
+    }
+    return '\$${buffer.toString()} MXN';
   }
 }
 
@@ -769,11 +942,16 @@ class _OrderMetaRow extends StatelessWidget {
           Expanded(
             child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
           ),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -789,6 +967,7 @@ class _ServiceChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       margin: const EdgeInsets.only(right: 8, bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -796,7 +975,7 @@ class _ServiceChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: AppColors.outline.withValues(alpha: 0.3)),
       ),
-      child: Text(label),
+      child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
     );
   }
 }

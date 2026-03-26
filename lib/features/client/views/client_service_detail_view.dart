@@ -42,6 +42,7 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
   bool _isInCart = false;
   String? _errorMessage;
   ClientServiceItem? _service;
+  Set<String> _selectedProductIds = <String>{};
   bool _didRefreshAfterImage403 = false;
 
   @override
@@ -79,6 +80,7 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
         _errorMessage = null;
         _isLoading = false;
         _didRefreshAfterImage403 = false;
+        _selectedProductIds = <String>{};
       });
       final bool isInCart = await _isServiceInCartUseCase(result.id);
       if (!mounted) {
@@ -110,11 +112,34 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
       return;
     }
 
+    final List<ClientServiceProduct> selectedProducts =
+        _resolveSelectedProducts(service);
+    final String itemName = service.resolvedName;
+    final int selectedProductsTotal = selectedProducts.fold<int>(
+      0,
+      (int sum, ClientServiceProduct product) => sum + product.unitPriceCents,
+    );
+    final int itemUnitPriceCents =
+        service.unitPriceCents + selectedProductsTotal;
+    final ClientServiceProduct? primaryProduct = selectedProducts.isEmpty
+        ? null
+        : selectedProducts.first;
+    final String? selectedProductsLabel = selectedProducts.isEmpty
+        ? null
+        : selectedProducts
+              .map((ClientServiceProduct p) => p.name.trim())
+              .join(', ');
+
     setState(() => _isAddingToCart = true);
     final bool added = await _addServiceToCartUseCase(
       serviceId: service.id,
-      name: service.name,
-      unitPriceCents: service.unitPriceCents,
+      name: itemName,
+      unitPriceCents: itemUnitPriceCents,
+      productId: primaryProduct?.id,
+      productName: selectedProductsLabel,
+      selectedProductIds: selectedProducts
+          .map((ClientServiceProduct p) => p.id)
+          .toList(),
     );
     if (!mounted) {
       return;
@@ -139,6 +164,55 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
       message: 'Servicio agregado al carrito.',
     );
     HapticFeedback.lightImpact();
+  }
+
+  List<ClientServiceProduct> _resolveSelectedProducts(
+    ClientServiceItem service,
+  ) {
+    if (service.products.isEmpty || _selectedProductIds.isEmpty) {
+      return const <ClientServiceProduct>[];
+    }
+    return service.products
+        .where(
+          (ClientServiceProduct product) =>
+              _selectedProductIds.contains(product.id),
+        )
+        .toList();
+  }
+
+  int _resolveCtaTotalCents(ClientServiceItem service) {
+    final List<ClientServiceProduct> selected = _resolveSelectedProducts(
+      service,
+    );
+    final int selectedTotal = selected.fold<int>(
+      0,
+      (int sum, ClientServiceProduct product) => sum + product.unitPriceCents,
+    );
+    return service.unitPriceCents + selectedTotal;
+  }
+
+  String _formatPriceLabelFromCents(int cents) {
+    if (cents <= 0) {
+      return 'Precio por definir';
+    }
+    final double amount = cents / 100;
+    final String fixed = amount.toStringAsFixed(
+      amount.truncateToDouble() == amount ? 0 : 2,
+    );
+    final List<String> parts = fixed.split('.');
+    final String wholePart = parts.first;
+    final StringBuffer buffer = StringBuffer();
+    for (int i = 0; i < wholePart.length; i++) {
+      final int reverseIndex = wholePart.length - i;
+      buffer.write(wholePart[i]);
+      if (reverseIndex > 1 && reverseIndex % 3 == 1) {
+        buffer.write(',');
+      }
+    }
+    final String decimalPart = parts.length > 1 && parts[1] != '00'
+        ? '.${parts[1]}'
+        : '';
+    return 'Desde \$$buffer$decimalPart MXN';
   }
 
   @override
@@ -167,6 +241,8 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
     }
 
     final ClientServiceItem service = _service!;
+    final int ctaTotalCents = _resolveCtaTotalCents(service);
+    final String ctaPriceLabel = _formatPriceLabelFromCents(ctaTotalCents);
 
     return Stack(
       children: <Widget>[
@@ -200,44 +276,42 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
             const SizedBox(height: 16),
             _ServiceHeader(service: service),
             const SizedBox(height: 12),
-            _QuickFacts(category: widget.category),
+            _QuickFacts(category: widget.category, service: service),
             const SizedBox(height: 16),
             _AvailabilityCard(),
             if (service.products.isNotEmpty) ...<Widget>[
               const SizedBox(height: 16),
-              _ProductOptionsSection(products: service.products),
+              _ProductOptionsSection(
+                products: service.products,
+                selectedProductIds: _selectedProductIds,
+                onToggle: (String productId) {
+                  setState(() {
+                    final Set<String> next = <String>{..._selectedProductIds};
+                    if (next.contains(productId)) {
+                      next.remove(productId);
+                    } else {
+                      next.add(productId);
+                    }
+                    _selectedProductIds = next;
+                  });
+                },
+              ),
             ],
             const SizedBox(height: 16),
             _InfoSection(
               title: 'Descripcion general',
-              body:
-                  'Servicio premium con coordinacion completa, montaje, desmontaje y soporte durante el evento. Los ajustes finales se definen en la confirmacion.',
+              body: service.description.trim().isEmpty
+                  ? 'El proveedor aun no agrego una descripcion detallada para este servicio.'
+                  : service.description,
             ),
-            const SizedBox(height: 12),
-            _InfoSection(
-              title: 'Incluye',
-              bullets: const <String>[
-                'Asesoria de logistica y layout',
-                'Montaje y desmontaje completo',
-                'Soporte durante el evento',
-                'Personal dedicado en sitio',
-              ],
-            ),
-            const SizedBox(height: 12),
-            _InfoSection(
-              title: 'Politicas',
-              bullets: const <String>[
-                'Anticipo requerido para apartar fecha',
-                'Cambios sujetos a disponibilidad',
-                'Cancelaciones con 15 dias de anticipacion',
-              ],
-            ),
-            const SizedBox(height: 12),
-            _InfoSection(
-              title: 'Resenas destacadas',
-              body:
-                  '"Atencion impecable y montaje sin retrasos. Nos ayudaron a resolver todo el mismo dia."',
-            ),
+            if (service.products.isEmpty) ...<Widget>[
+              const SizedBox(height: 12),
+              const _InfoSection(
+                title: 'Productos',
+                body:
+                    'Este servicio aun no tiene productos publicados. En cuanto el proveedor los publique, apareceran aqui.',
+              ),
+            ],
           ],
         ),
         Positioned(
@@ -248,7 +322,7 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
             top: false,
             minimum: const EdgeInsets.only(bottom: 60),
             child: _BottomCta(
-              priceLabel: service.priceLabel,
+              priceLabel: ctaPriceLabel,
               isAdded: _isInCart,
               isAdding: _isAddingToCart,
               onAdd: _addCurrentServiceToCart,
@@ -323,7 +397,7 @@ class _HeroGallery extends StatelessWidget {
                     tag: 'client-service-badge-${service.id}',
                     child: Material(
                       type: MaterialType.transparency,
-                      child: _Badge(label: service.badge),
+                      child: _Badge(label: service.resolvedBadge),
                     ),
                   ),
                 ),
@@ -395,21 +469,23 @@ class _ServiceHeader extends StatelessWidget {
           child: Material(
             type: MaterialType.transparency,
             child: Text(
-              service.name,
+              service.resolvedName,
               style: Theme.of(context).textTheme.headlineSmall,
             ),
           ),
         ),
         const SizedBox(height: 6),
-        Text(service.subtitle),
+        Text(service.resolvedSubtitle),
         const SizedBox(height: 10),
         Row(
           children: <Widget>[
-            _RatingPill(),
-            const SizedBox(width: 10),
+            if (service.resolvedBadge.isNotEmpty) ...<Widget>[
+              _ServiceBadgePill(label: service.resolvedBadge),
+              const SizedBox(width: 10),
+            ],
             Expanded(
               child: Text(
-                service.priceLabel,
+                service.resolvedPriceLabel,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: AppColors.activeIcon,
@@ -424,29 +500,46 @@ class _ServiceHeader extends StatelessWidget {
 }
 
 class _QuickFacts extends StatelessWidget {
-  const _QuickFacts({required this.category});
+  const _QuickFacts({required this.category, required this.service});
 
   final ClientServiceCategory category;
+  final ClientServiceItem service;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 8,
-      children: <Widget>[
-        _FactChip(icon: Icons.location_on_rounded, label: 'Monterrey, N.L.'),
-        _FactChip(icon: Icons.schedule_rounded, label: '8-10 horas'),
-        _FactChip(icon: Icons.group_rounded, label: 'Hasta 350 invitados'),
-        _FactChip(icon: category.icon, label: category.title),
-      ],
-    );
+    final List<Widget> facts = <Widget>[
+      _FactChip(icon: category.icon, label: category.title),
+      _FactChip(
+        icon: Icons.inventory_2_rounded,
+        label: service.products.isEmpty
+            ? 'Sin productos publicados'
+            : '${service.products.length} productos disponibles',
+      ),
+    ];
+
+    if (service.resolvedSubtitle.trim().isNotEmpty) {
+      facts.add(
+        _FactChip(
+          icon: Icons.info_outline_rounded,
+          label: service.resolvedSubtitle,
+        ),
+      );
+    }
+
+    return Wrap(spacing: 10, runSpacing: 8, children: facts);
   }
 }
 
 class _ProductOptionsSection extends StatelessWidget {
-  const _ProductOptionsSection({required this.products});
+  const _ProductOptionsSection({
+    required this.products,
+    required this.selectedProductIds,
+    required this.onToggle,
+  });
 
   final List<ClientServiceProduct> products;
+  final Set<String> selectedProductIds;
+  final ValueChanged<String> onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -457,19 +550,23 @@ class _ProductOptionsSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              'Productos disponibles',
+              'Productos adicionales',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 6),
             Text(
-              'Estos productos ya estan publicados por el proveedor.',
+              'Selecciona los que quieras agregar a tu servicio.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 14),
             ...products.map(
               (ClientServiceProduct product) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: _ProductOptionCard(product: product),
+                child: _ProductOptionCard(
+                  product: product,
+                  isSelected: selectedProductIds.contains(product.id),
+                  onTap: () => onToggle(product.id),
+                ),
               ),
             ),
           ],
@@ -480,70 +577,104 @@ class _ProductOptionsSection extends StatelessWidget {
 }
 
 class _ProductOptionCard extends StatelessWidget {
-  const _ProductOptionCard({required this.product});
+  const _ProductOptionCard({
+    required this.product,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   final ClientServiceProduct product;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.fieldBackground,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: <Widget>[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              width: 72,
-              height: 72,
-              child: AppRemoteImage(
-                imageUrl: product.imageUrl,
-                fit: BoxFit.cover,
-                placeholder: Container(
-                  color: AppColors.cardAccent,
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.image_outlined,
-                    color: AppColors.secondaryText,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppColors.secondaryButton.withValues(alpha: 0.25)
+                : AppColors.fieldBackground,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected
+                  ? AppColors.activeIcon.withValues(alpha: 0.6)
+                  : AppColors.outline.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: <Widget>[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: AppRemoteImage(
+                    imageUrl: product.imageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: Container(
+                      color: AppColors.cardAccent,
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.image_outlined,
+                        color: AppColors.secondaryText,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            product.name,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          isSelected
+                              ? Icons.check_circle_rounded
+                              : Icons.add_circle_outline_rounded,
+                          size: 20,
+                          color: isSelected
+                              ? AppColors.activeIcon
+                              : AppColors.secondaryText,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      product.description.trim().isEmpty
+                          ? 'Sin descripcion disponible.'
+                          : product.description,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      product.priceLabel,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.activeIcon,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  product.name,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  product.description.trim().isEmpty
-                      ? 'Sin descripcion disponible.'
-                      : product.description,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  product.priceLabel,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.activeIcon,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -559,23 +690,28 @@ class _AvailabilityCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              'Disponibilidad sugerida',
+              'Disponibilidad',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            Row(
               children: const <Widget>[
-                _Pill(label: 'Vie 22 Mar'),
-                _Pill(label: 'Sab 30 Mar'),
-                _Pill(label: 'Dom 07 Abr'),
-                _Pill(label: 'Sab 13 Abr'),
+                Icon(
+                  Icons.event_available_rounded,
+                  size: 18,
+                  color: AppColors.activeIcon,
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'La disponibilidad se confirma con el proveedor al momento de reservar.',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
             Text(
-              'Selecciona una fecha para confirmar disponibilidad real.',
+              'Proximamente se mostrara calendario en tiempo real.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
@@ -586,11 +722,10 @@ class _AvailabilityCard extends StatelessWidget {
 }
 
 class _InfoSection extends StatelessWidget {
-  const _InfoSection({required this.title, this.body, this.bullets});
+  const _InfoSection({required this.title, this.body});
 
   final String title;
   final String? body;
-  final List<String>? bullets;
 
   @override
   Widget build(BuildContext context) {
@@ -603,32 +738,6 @@ class _InfoSection extends StatelessWidget {
         const SizedBox(height: 6),
         Text(body!, style: Theme.of(context).textTheme.bodyMedium),
       ]);
-    }
-
-    if (bullets != null) {
-      children.add(const SizedBox(height: 6));
-      children.add(
-        Column(
-          children: bullets!
-              .map(
-                (String item) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: <Widget>[
-                      const Icon(
-                        Icons.check_circle_rounded,
-                        size: 18,
-                        color: AppColors.activeIcon,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(item)),
-                    ],
-                  ),
-                ),
-              )
-              .toList(),
-        ),
-      );
     }
 
     return Card(
@@ -728,6 +837,9 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (label.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -771,7 +883,11 @@ class _FactChip extends StatelessWidget {
   }
 }
 
-class _RatingPill extends StatelessWidget {
+class _ServiceBadgePill extends StatelessWidget {
+  const _ServiceBadgePill({required this.label});
+
+  final String label;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -783,36 +899,16 @@ class _RatingPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          const Icon(Icons.star_rounded, size: 16, color: AppColors.appBar),
+          const Icon(Icons.sell_rounded, size: 16, color: AppColors.appBar),
           const SizedBox(width: 4),
           Text(
-            '4.9',
+            label,
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
           ),
-          const SizedBox(width: 4),
-          Text('(128)', style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
-    );
-  }
-}
-
-class _Pill extends StatelessWidget {
-  const _Pill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.cardAccent,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(label),
     );
   }
 }

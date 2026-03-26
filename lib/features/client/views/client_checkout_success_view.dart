@@ -114,7 +114,7 @@ class _ClientCheckoutSuccessViewState extends State<ClientCheckoutSuccessView> {
                           _MetaRow(
                             label: 'Estado',
                             valueWidget: const OrderStatusChip(
-                              status: ClientOrderStatus.pendingPayment,
+                              status: ClientOrderStatus.pendingProviderApproval,
                             ),
                           ),
                           _MetaRow(label: 'Servicio', value: widget.title),

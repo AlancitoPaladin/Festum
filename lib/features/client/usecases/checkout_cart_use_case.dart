@@ -1,4 +1,5 @@
 import 'package:festum/features/client/models/client_order_item.dart';
+import 'package:festum/features/client/models/client_cart_item.dart';
 import 'package:festum/features/client/repositories/client_cart_repository.dart';
 import 'package:festum/features/client/repositories/client_orders_repository.dart';
 
@@ -8,39 +9,46 @@ class CheckoutCartUseCase {
   final ClientCartRepository _cartRepository;
   final ClientOrdersRepository _ordersRepository;
 
-  Future<ClientOrderItem?> call() async {
+  Future<ClientOrderItem?> call({
+    required DateTime eventDate,
+    String? notes,
+  }) async {
     final cartItems = await _cartRepository.getCartItems();
     if (cartItems.isEmpty) {
       return null;
     }
 
+    final ClientOrderItem created = await _ordersRepository.submitOrderRequest(
+      items: cartItems,
+      eventDate: eventDate,
+      notes: notes,
+    );
+    final String fallbackTitle = cartItems.length == 1
+        ? cartItems.first.resolvedServiceName
+        : '${cartItems.first.resolvedServiceName} +${cartItems.length - 1} servicios';
+    final String fallbackTotalLabel = _estimateTotalLabel(cartItems);
+    final ClientOrderItem normalized = created.copyWith(
+      title: created.title.trim().isEmpty ? fallbackTitle : created.title,
+      totalLabel: _looksInvalidTotalLabel(created.totalLabel)
+          ? fallbackTotalLabel
+          : created.totalLabel,
+    );
+
+    await _cartRepository.clear();
+    return normalized;
+  }
+
+  String _estimateTotalLabel(List<ClientCartItem> cartItems) {
     final int subtotal = cartItems.fold<int>(
       0,
-      (int sum, item) => sum + item.unitPriceCents,
+      (int sum, ClientCartItem item) =>
+          sum + item.unitPriceCents * item.quantity,
     );
     final int serviceFee = (subtotal * 0.05).round();
     final int tax = ((subtotal + serviceFee) * 0.16).round();
     final int total = subtotal + serviceFee + tax;
 
-    final String title;
-    if (cartItems.length == 1) {
-      title = cartItems.first.name;
-    } else {
-      title = '${cartItems.first.name} +${cartItems.length - 1} servicios';
-    }
-
-    final ClientOrderItem created = await _ordersRepository.createOrder(
-      title: title,
-      status: ClientOrderStatus.pendingPayment,
-      totalLabel: _formatCurrency(total),
-    );
-
-    await _cartRepository.clear();
-    return created;
-  }
-
-  String _formatCurrency(int cents) {
-    final int pesos = (cents / 100).round();
+    final int pesos = (total / 100).round();
     final String raw = pesos.toString();
     final StringBuffer buffer = StringBuffer();
     for (int i = 0; i < raw.length; i++) {
@@ -51,5 +59,16 @@ class CheckoutCartUseCase {
       }
     }
     return '\$${buffer.toString()} MXN';
+  }
+
+  bool _looksInvalidTotalLabel(String value) {
+    final String normalized = value.trim().toLowerCase();
+    return normalized.isEmpty ||
+        normalized == '-' ||
+        normalized == '0' ||
+        normalized == '\$0' ||
+        normalized == '\$0 mxn' ||
+        normalized == '\$0.00 mxn' ||
+        normalized == '0 mxn';
   }
 }

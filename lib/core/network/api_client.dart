@@ -42,21 +42,21 @@ class ApiClient {
   }) async {
     final Response<dynamic> response = await _dio.post<dynamic>(
       '$_authBasePath/login',
-      data: <String, dynamic>{
-        'email': email,
-        'password': password,
-      },
+      data: <String, dynamic>{'email': email, 'password': password},
     );
 
     return _toMap(response.data);
   }
 
   Future<Map<String, dynamic>> me() async {
-    final Response<dynamic> response = await _dio.get<dynamic>('$_authBasePath/me');
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '$_authBasePath/me',
+    );
     return _toMap(response.data);
   }
 
-  Future<Map<String, List<Map<String, dynamic>>>> getClientServicesHome() async {
+  Future<Map<String, List<Map<String, dynamic>>>>
+  getClientServicesHome() async {
     final Response<dynamic> response = await _dio.get<dynamic>(
       '$_clientBasePath/services/home',
     );
@@ -106,16 +106,16 @@ class ApiClient {
   }
 
   Future<List<Map<String, dynamic>>> getClientCartItems() async {
-    final Response<dynamic> response = await _dio.get<dynamic>('$_clientBasePath/cart');
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '$_clientBasePath/cart',
+    );
     return _extractItemsList(
       response.data,
       keys: const <String>['items', 'cart_items', 'cart', 'results'],
     );
   }
 
-  Future<bool> containsServiceInClientCart({
-    required String serviceId,
-  }) async {
+  Future<bool> containsServiceInClientCart({required String serviceId}) async {
     final Response<dynamic> response = await _dio.get<dynamic>(
       '$_clientBasePath/cart/contains/$serviceId',
     );
@@ -127,14 +127,27 @@ class ApiClient {
     required String serviceId,
     required String name,
     required int unitPriceCents,
+    String? productId,
+    String? productName,
+    List<String>? selectedProductIds,
   }) async {
+    final Map<String, dynamic> payload = <String, dynamic>{
+      'service_id': serviceId,
+      'name': name,
+      'unit_price_cents': unitPriceCents,
+      if (productId != null && productId.trim().isNotEmpty)
+        'product_id': productId.trim(),
+      if (productName != null && productName.trim().isNotEmpty)
+        'product_name': productName.trim(),
+      if (selectedProductIds != null && selectedProductIds.isNotEmpty)
+        'selected_product_ids': selectedProductIds
+            .map((String value) => value.trim())
+            .where((String value) => value.isNotEmpty)
+            .toList(),
+    };
     final Response<dynamic> response = await _dio.post<dynamic>(
       '$_clientBasePath/cart/items',
-      data: <String, dynamic>{
-        'service_id': serviceId,
-        'name': name,
-        'unit_price_cents': unitPriceCents,
-      },
+      data: payload,
     );
 
     final Map<String, dynamic> data = _toMap(response.data);
@@ -167,10 +180,7 @@ class ApiClient {
   }) async {
     await _dio.post<dynamic>(
       '$_clientBasePath/cart/restore',
-      data: <String, dynamic>{
-        'item': item,
-        'index': index,
-      },
+      data: <String, dynamic>{'item': item, 'index': index},
     );
   }
 
@@ -193,6 +203,24 @@ class ApiClient {
   }) async {
     final Response<dynamic> response = await _dio.post<dynamic>(
       '$_clientBasePath/orders',
+      data: payload,
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> checkoutClientOrder() async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '$_clientBasePath/orders/checkout',
+      data: const <String, dynamic>{},
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> submitClientOrderRequest({
+    required Map<String, dynamic> payload,
+  }) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '$_clientBasePath/orders/requests',
       data: payload,
     );
     return _toMap(response.data);
@@ -253,7 +281,9 @@ class ApiClient {
     return _toMap(response.data);
   }
 
-  Future<Map<String, dynamic>> uploadProviderBusinessLogo(String filePath) async {
+  Future<Map<String, dynamic>> uploadProviderBusinessLogo(
+    String filePath,
+  ) async {
     final String fileName = _fileNameFromPath(filePath);
     final FormData formData = FormData.fromMap(<String, dynamic>{
       'file': await MultipartFile.fromFile(filePath, filename: fileName),
@@ -266,7 +296,9 @@ class ApiClient {
     return _toMap(response.data);
   }
 
-  Future<Map<String, dynamic>> uploadProviderBusinessPhoto(String filePath) async {
+  Future<Map<String, dynamic>> uploadProviderBusinessPhoto(
+    String filePath,
+  ) async {
     final String fileName = _fileNameFromPath(filePath);
     final FormData formData = FormData.fromMap(<String, dynamic>{
       'file': await MultipartFile.fromFile(filePath, filename: fileName),
@@ -284,6 +316,26 @@ class ApiClient {
       '$_providersBasePath/me/products/reservations',
     );
     return _toMap(response.data);
+  }
+
+  Future<List<Map<String, dynamic>>> getProviderOrderRequests() async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '$_providersBasePath/me/order-requests',
+    );
+    return _extractItemsList(
+      response.data,
+      keys: const <String>['items', 'requests', 'results'],
+    );
+  }
+
+  Future<void> decideProviderOrderRequest({
+    required String requestId,
+    required String decision,
+  }) async {
+    await _dio.patch<dynamic>(
+      '$_providersBasePath/me/order-requests/$requestId/decision',
+      data: <String, dynamic>{'decision': decision},
+    );
   }
 
   Future<Map<String, dynamic>> getProviderProductAvailability({
@@ -309,7 +361,9 @@ class ApiClient {
     return _toMap(response.data);
   }
 
-  Future<Map<String, dynamic>> getProviderBookingDetail(String bookingId) async {
+  Future<Map<String, dynamic>> getProviderBookingDetail(
+    String bookingId,
+  ) async {
     final Response<dynamic> response = await _dio.get<dynamic>(
       '$_providersBasePath/me/bookings/$bookingId',
     );

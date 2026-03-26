@@ -70,7 +70,8 @@ class ProviderHomeViewModel extends BaseViewModel {
         _getProviderProductReservationsUseCase(),
       ]);
 
-      final ProviderHomeResponse homeResponse = results[0] as ProviderHomeResponse;
+      final ProviderHomeResponse homeResponse =
+          results[0] as ProviderHomeResponse;
       final ProviderNotificationsResponse notificationsResponse =
           results[1] as ProviderNotificationsResponse;
       final List<ProductReservationSummary> reservationProducts =
@@ -162,27 +163,50 @@ class ProviderHomeViewModel extends BaseViewModel {
   ) {
     final Map<String, int> reservationsByServiceId = <String, int>{};
     for (final ProductReservationSummary item in reservationProducts) {
-      if (item.serviceId.trim().isEmpty || item.nextBooking == null) {
+      if (item.serviceId.trim().isEmpty) {
+        continue;
+      }
+      final int reservationWeight = item.reservationsCount > 0
+          ? item.reservationsCount
+          : (item.nextBooking == null ? 0 : 1);
+      if (reservationWeight <= 0) {
         continue;
       }
       reservationsByServiceId.update(
         item.serviceId,
-        (int current) => current + 1,
-        ifAbsent: () => 1,
+        (int current) => current + reservationWeight,
+        ifAbsent: () => reservationWeight,
       );
     }
 
+    final int derivedReservations = reservationsByServiceId.values.fold<int>(
+      0,
+      (int sum, int value) => sum + value,
+    );
     final List<ProviderFeaturedService> featuredServices = home.featuredServices
         .map((ProviderFeaturedService service) {
-          final String normalizedPrice = _normalizePriceLabel(service.priceLabel);
+          final String normalizedPrice = _normalizePriceLabel(
+            service.priceLabel,
+          );
           return service.copyWith(
-            reservations: reservationsByServiceId[service.id] ?? service.reservations,
+            reservations:
+                reservationsByServiceId[service.id] ?? service.reservations,
             priceLabel: normalizedPrice,
           );
         })
         .toList();
 
-    return home.copyWith(featuredServices: featuredServices);
+    final int reservationsThisMonth = home.quickStats.reservationsThisMonth > 0
+        ? home.quickStats.reservationsThisMonth
+        : derivedReservations;
+
+    return home.copyWith(
+      featuredServices: featuredServices,
+      quickStats: ProviderQuickStats(
+        reservationsThisMonth: reservationsThisMonth,
+        activeServices: home.quickStats.activeServices,
+      ),
+    );
   }
 
   String _normalizePriceLabel(String value) {

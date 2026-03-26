@@ -40,6 +40,9 @@ class MockClientCartRepository implements ClientCartRepository {
     required String serviceId,
     required String name,
     required int unitPriceCents,
+    String? productId,
+    String? productName,
+    List<String>? selectedProductIds,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 160));
     if (_items.any((ClientCartItem item) => item.id == serviceId)) {
@@ -51,6 +54,10 @@ class MockClientCartRepository implements ClientCartRepository {
         name: name,
         quantity: 1,
         unitPriceCents: unitPriceCents,
+        serviceName: name,
+        productId: productId,
+        productName: productName,
+        selectedProductIds: selectedProductIds ?? const <String>[],
       ),
     );
     return true;
@@ -83,6 +90,10 @@ class MockClientCartRepository implements ClientCartRepository {
         name: item.name,
         quantity: 1,
         unitPriceCents: item.unitPriceCents,
+        serviceName: item.serviceName,
+        productId: item.productId,
+        productName: item.productName,
+        selectedProductIds: item.selectedProductIds,
       ),
     );
   }

@@ -16,11 +16,7 @@ enum ClientServiceCategory {
     title: 'Banquetes',
     icon: Icons.restaurant_menu_rounded,
   ),
-  dj(
-    slug: 'dj',
-    title: 'Musica / DJ',
-    icon: Icons.music_note_rounded,
-  ),
+  dj(slug: 'dj', title: 'Musica / DJ', icon: Icons.music_note_rounded),
   decoration(
     slug: 'decoracion',
     title: 'Decoracion',
@@ -35,7 +31,8 @@ enum ClientServiceCategory {
     slug: 'entretenimiento',
     title: 'Entretenimiento',
     icon: Icons.theater_comedy_rounded,
-  );
+  ),
+  uncategorized(slug: 'otros', title: 'Otros', icon: Icons.grid_view_rounded);
 
   const ClientServiceCategory({
     required this.slug,
@@ -62,6 +59,7 @@ class ClientServiceItem {
     required this.id,
     required this.name,
     required this.subtitle,
+    this.description = '',
     required this.priceLabel,
     required this.unitPriceCents,
     required this.badge,
@@ -76,6 +74,7 @@ class ClientServiceItem {
   final String id;
   final String name;
   final String subtitle;
+  final String description;
   final String priceLabel;
   final int unitPriceCents;
   final String badge;
@@ -86,9 +85,35 @@ class ClientServiceItem {
   final String? displayNameShort;
   final String? displaySubtitleShort;
 
-  String get cardName => displayNameShort ?? _truncateForCard(name, 26);
+  String get resolvedName {
+    final String candidate = name.trim();
+    return candidate.isEmpty ? 'Servicio sin nombre' : candidate;
+  }
+
+  String get resolvedSubtitle {
+    final String candidate = subtitle.trim();
+    return candidate.isEmpty ? 'Sin descripcion breve' : candidate;
+  }
+
+  String get resolvedPriceLabel {
+    final String candidate = priceLabel.trim();
+    if (candidate.isEmpty || _isQuoteOnlyLabel(candidate)) {
+      if (unitPriceCents > 0) {
+        return _buildPriceLabelFromCents(unitPriceCents);
+      }
+      return 'Precio por definir';
+    }
+    return candidate;
+  }
+
+  String get resolvedBadge {
+    final String candidate = badge.trim();
+    return candidate;
+  }
+
+  String get cardName => displayNameShort ?? _truncateForCard(resolvedName, 26);
   String get cardSubtitle =>
-      displaySubtitleShort ?? _truncateForCard(subtitle, 34);
+      displaySubtitleShort ?? _truncateForCard(resolvedSubtitle, 34);
 
   String _truncateForCard(String value, int maxChars) {
     final String input = value.trim();
@@ -100,6 +125,34 @@ class ClientServiceItem {
       return '${input.substring(0, maxChars - 1)}...';
     }
     return '${input.substring(0, pivot)}...';
+  }
+
+  bool _isQuoteOnlyLabel(String value) {
+    final String normalized = value.trim().toLowerCase();
+    return normalized == 'cotiza' ||
+        normalized == 'cotizar' ||
+        normalized == 'precio por definir';
+  }
+
+  String _buildPriceLabelFromCents(int cents) {
+    final double amount = cents / 100;
+    final String fixed = amount.toStringAsFixed(
+      amount.truncateToDouble() == amount ? 0 : 2,
+    );
+    final List<String> parts = fixed.split('.');
+    final String wholePart = parts.first;
+    final StringBuffer buffer = StringBuffer();
+    for (int i = 0; i < wholePart.length; i++) {
+      final int reverseIndex = wholePart.length - i;
+      buffer.write(wholePart[i]);
+      if (reverseIndex > 1 && reverseIndex % 3 == 1) {
+        buffer.write(',');
+      }
+    }
+    final String decimalPart = parts.length > 1 && parts[1] != '00'
+        ? '.${parts[1]}'
+        : '';
+    return 'Desde \$$buffer$decimalPart MXN';
   }
 }
 

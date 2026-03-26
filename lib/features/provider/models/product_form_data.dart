@@ -62,4 +62,42 @@ class ProductFormData {
     this.extraHourAllowed = false,
     this.extraHourPrice = 0,
   });
+
+  static double parseDecimalInput(String rawValue) {
+    final String sanitized = rawValue
+        .trim()
+        .replaceAll('\$', '')
+        .replaceAll(RegExp(r'[^0-9.,]'), '');
+    if (sanitized.isEmpty) {
+      return 0;
+    }
+
+    final int lastDot = sanitized.lastIndexOf('.');
+    final int lastComma = sanitized.lastIndexOf(',');
+    final int separatorIndex = lastDot > lastComma ? lastDot : lastComma;
+    final bool hasSeparator = separatorIndex >= 0;
+    final String tailDigits = hasSeparator
+        ? sanitized
+              .substring(separatorIndex + 1)
+              .replaceAll(RegExp(r'[^0-9]'), '')
+        : '';
+    final bool useDecimalSeparator = hasSeparator && tailDigits.length <= 2;
+
+    final String integerPart =
+        (useDecimalSeparator
+                ? sanitized.substring(0, separatorIndex)
+                : sanitized)
+            .replaceAll(RegExp(r'[^0-9]'), '');
+    final String decimalPart = useDecimalSeparator ? tailDigits : '';
+
+    if (integerPart.isEmpty && decimalPart.isEmpty) {
+      return 0;
+    }
+
+    final String normalizedInteger = integerPart.isEmpty ? '0' : integerPart;
+    final String normalized = decimalPart.isEmpty
+        ? normalizedInteger
+        : '$normalizedInteger.$decimalPart';
+    return double.tryParse(normalized) ?? 0;
+  }
 }

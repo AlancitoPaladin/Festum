@@ -52,10 +52,12 @@ import 'package:festum/features/provider/usecases/delete_provider_product_image_
 import 'package:festum/features/provider/usecases/delete_provider_service_image_use_case.dart';
 import 'package:festum/features/provider/usecases/delete_provider_product_use_case.dart';
 import 'package:festum/features/provider/usecases/delete_provider_service_product_use_case.dart';
+import 'package:festum/features/provider/usecases/decide_provider_order_request_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_business_profile_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_booking_detail_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_home_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_notifications_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_order_requests_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_product_availability_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_product_detail_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_product_reservations_use_case.dart';
@@ -185,10 +187,19 @@ Future<void> setupLocator() async {
       locator<ProviderReservationsRepository>(),
     ),
   );
-  locator.registerLazySingleton<DeleteProviderProductUseCase>(
-    () => DeleteProviderProductUseCase(
+  locator.registerLazySingleton<GetProviderOrderRequestsUseCase>(
+    () => GetProviderOrderRequestsUseCase(
       locator<ProviderReservationsRepository>(),
     ),
+  );
+  locator.registerLazySingleton<DecideProviderOrderRequestUseCase>(
+    () => DecideProviderOrderRequestUseCase(
+      locator<ProviderReservationsRepository>(),
+    ),
+  );
+  locator.registerLazySingleton<DeleteProviderProductUseCase>(
+    () =>
+        DeleteProviderProductUseCase(locator<ProviderReservationsRepository>()),
   );
   locator.registerLazySingleton<ProviderBookingsRepository>(
     () => ProviderBookingsRepository(locator<ApiClient>()),
@@ -197,7 +208,8 @@ Future<void> setupLocator() async {
     () => CreateManualBookingUseCase(locator<ProviderBookingsRepository>()),
   );
   locator.registerLazySingleton<GetProviderBookingDetailUseCase>(
-    () => GetProviderBookingDetailUseCase(locator<ProviderBookingsRepository>()),
+    () =>
+        GetProviderBookingDetailUseCase(locator<ProviderBookingsRepository>()),
   );
   locator.registerLazySingleton<UpdateProviderBookingUseCase>(
     () => UpdateProviderBookingUseCase(locator<ProviderBookingsRepository>()),
@@ -242,7 +254,8 @@ Future<void> setupLocator() async {
     ),
   );
   locator.registerLazySingleton<GetProviderProductDetailUseCase>(
-    () => GetProviderProductDetailUseCase(locator<ProviderProductsRepository>()),
+    () =>
+        GetProviderProductDetailUseCase(locator<ProviderProductsRepository>()),
   );
   locator.registerLazySingleton<UpdateProviderProductUseCase>(
     () => UpdateProviderProductUseCase(locator<ProviderProductsRepository>()),
@@ -253,7 +266,9 @@ Future<void> setupLocator() async {
     ),
   );
   locator.registerLazySingleton<UploadProviderProductImageUseCase>(
-    () => UploadProviderProductImageUseCase(locator<ProviderProductsRepository>()),
+    () => UploadProviderProductImageUseCase(
+      locator<ProviderProductsRepository>(),
+    ),
   );
   locator.registerLazySingleton<SetProviderProductMainImageUseCase>(
     () => SetProviderProductMainImageUseCase(

@@ -8,6 +8,7 @@ import 'package:festum/features/provider/usecases/delete_provider_service_image_
 import 'package:festum/features/provider/usecases/get_provider_services_use_case.dart';
 import 'package:festum/features/provider/usecases/set_provider_service_main_image_use_case.dart';
 import 'package:festum/features/provider/usecases/upload_provider_service_image_use_case.dart';
+import 'package:festum/features/provider/usecases/update_provider_service_status_use_case.dart';
 import 'package:festum/features/provider/usecases/update_provider_service_use_case.dart';
 import 'package:festum/features/provider/utils/provider_field_input.dart';
 import 'package:festum/features/provider/viewmodels/edit_service_viewmodel.dart';
@@ -26,6 +27,11 @@ class EditServiceView extends StatelessWidget {
   final String serviceId;
   final String serviceName;
   final ServiceCategory category;
+  static final GlobalKey _nameFieldKey = GlobalKey();
+  static final GlobalKey _subtitleFieldKey = GlobalKey();
+  static final GlobalKey _categoryFieldKey = GlobalKey();
+  static final GlobalKey _priceFieldKey = GlobalKey();
+  static final GlobalKey _descriptionFieldKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +42,8 @@ class EditServiceView extends StatelessWidget {
         category: category,
         getProviderServicesUseCase: locator<GetProviderServicesUseCase>(),
         updateProviderServiceUseCase: locator<UpdateProviderServiceUseCase>(),
+        updateProviderServiceStatusUseCase:
+            locator<UpdateProviderServiceStatusUseCase>(),
         uploadProviderServiceImageUseCase:
             locator<UploadProviderServiceImageUseCase>(),
         setProviderServiceMainImageUseCase:
@@ -54,163 +62,229 @@ class EditServiceView extends StatelessWidget {
           );
         }
 
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: AppColors.primaryText),
-              onPressed: () => Navigator.of(context).maybePop(),
+        return PopScope(
+          canPop: !model.hasPendingChanges,
+          onPopInvokedWithResult: (bool didPop, Object? result) async {
+            if (didPop) {
+              return;
+            }
+            final bool allowExit = await _handleExit(context, model);
+            if (!context.mounted || !allowExit) {
+              return;
+            }
+            Navigator.of(context).pop();
+          },
+          child: Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: AppColors.primaryText,
+                ),
+                onPressed: () async {
+                  final bool allowExit = await _handleExit(context, model);
+                  if (!context.mounted || !allowExit) {
+                    return;
+                  }
+                  Navigator.of(context).pop();
+                },
+              ),
             ),
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Editar servicio',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: AppColors.primaryText,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Actualiza la informacion esencial de tu servicio.',
-                  style: TextStyle(
-                    color: AppColors.secondaryText,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                if (model.generalErrorMessage != null)
-                  _ErrorBanner(message: model.generalErrorMessage!),
-                if (model.generalErrorMessage != null)
-                  const SizedBox(height: 16),
-                const Text(
-                  'Detalles del servicio',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryText,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  controller: model.nameController,
-                  label: 'Nombre del servicio',
-                  hint: 'Ej. Salon para eventos',
-                  onChanged: model.updateName,
-                  inputKind: ProviderFieldInputKind.title,
-                  errorText: model.fieldError('name'),
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  controller: model.subtitleController,
-                  label: 'Subtitulo',
-                  hint: 'Ej. Hasta 250 invitados',
-                  onChanged: model.updateSubtitle,
-                  inputKind: ProviderFieldInputKind.mixedText,
-                  errorText: model.fieldError('subtitle'),
-                ),
-                const SizedBox(height: 16),
-                _buildDropdownField(model),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  controller: model.descriptionController,
-                  label: 'Descripcion del servicio',
-                  hint: 'Describe tu servicio, que ofreces?',
-                  maxLines: 4,
-                  onChanged: model.updateDescription,
-                  inputKind: ProviderFieldInputKind.mixedText,
-                  errorText: model.fieldError('description'),
-                ),
-                const SizedBox(height: 32),
-                const Text(
-                  'Precio',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryText,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                _InfoCard(
-                  title: model.formData.unitPriceCents > 0
-                      ? 'Precio actual de referencia'
-                      : 'Precio pendiente de productos',
-                  subtitle: model.formData.unitPriceCents > 0
-                      ? 'Este servicio conserva un precio de referencia mientras se termina de automatizar el calculo desde tus productos.'
-                      : 'Cuando tengas productos publicados, el cliente vera automaticamente el precio mas bajo disponible.',
-                ),
-                const SizedBox(height: 32),
-                const Text(
-                  'Fotos',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryText,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _buildPhotoSummary(model),
-                  style: const TextStyle(
-                    color: AppColors.secondaryText,
-                    fontSize: 13,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _ServiceImagesSection(
-                  model: model,
-                  onAddImage: () => _runImageAction(
-                    context,
-                    model.uploadImage,
-                    successMessage: 'Imagen subida.',
-                  ),
-                  onMarkAsMain: (String imageKey) => _runImageAction(
-                    context,
-                    () => model.markImageAsMain(imageKey),
-                    successMessage: 'Imagen principal actualizada.',
-                  ),
-                  onDeleteImage: (String imageKey) => _runImageAction(
-                    context,
-                    () => model.deleteImage(imageKey),
-                    successMessage: 'Imagen eliminada.',
-                  ),
-                ),
-                const SizedBox(height: 48),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: model.isBusy || model.isUploadingImage
-                        ? null
-                        : () => _save(context, model),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromRGBO(125, 139, 114, 1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 0,
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Editar servicio',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: AppColors.primaryText,
+                      fontWeight: FontWeight.bold,
                     ),
-                    child: model.isBusy
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                            'Guardar cambios',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
                   ),
-                ),
-                const SizedBox(height: 32),
-              ],
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Actualiza la informacion esencial de tu servicio.',
+                    style: TextStyle(
+                      color: AppColors.secondaryText,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  if (model.generalErrorMessage != null)
+                    _ErrorBanner(message: model.generalErrorMessage!),
+                  if (model.generalErrorMessage != null)
+                    const SizedBox(height: 16),
+                  _ServiceStatusCard(
+                    statusLabel: model.statusLabel,
+                    isPublished: model.isPublished,
+                    isUpdating: model.isUpdatingStatus,
+                    onToggle: () => _toggleStatus(context, model),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Detalles del servicio',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  KeyedSubtree(
+                    key: _nameFieldKey,
+                    child: _buildTextField(
+                      controller: model.nameController,
+                      label: 'Nombre del servicio',
+                      hint: 'Ej. Salon para eventos',
+                      onChanged: model.updateName,
+                      inputKind: ProviderFieldInputKind.title,
+                      errorText: model.fieldError('name'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  KeyedSubtree(
+                    key: _subtitleFieldKey,
+                    child: _buildTextField(
+                      controller: model.subtitleController,
+                      label: 'Subtitulo',
+                      hint: 'Ej. Hasta 250 invitados',
+                      onChanged: model.updateSubtitle,
+                      inputKind: ProviderFieldInputKind.mixedText,
+                      errorText: model.fieldError('subtitle'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  KeyedSubtree(
+                    key: _categoryFieldKey,
+                    child: _buildDropdownField(model),
+                  ),
+                  const SizedBox(height: 16),
+                  KeyedSubtree(
+                    key: _descriptionFieldKey,
+                    child: _buildTextField(
+                      controller: model.descriptionController,
+                      label: 'Descripcion del servicio',
+                      hint: 'Describe tu servicio, que ofreces?',
+                      maxLines: 4,
+                      onChanged: model.updateDescription,
+                      inputKind: ProviderFieldInputKind.mixedText,
+                      errorText: model.fieldError('description'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _ClientPreviewCard(
+                    name: model.previewName,
+                    subtitle: model.previewSubtitle,
+                    priceLabel: model.previewPriceLabel,
+                    badge: model.previewBadge,
+                    category: model.selectedCategory,
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'Precio',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  KeyedSubtree(
+                    key: _priceFieldKey,
+                    child: _buildTextField(
+                      controller: model.unitPriceController,
+                      label: 'Precio de referencia (MXN)',
+                      hint: 'Ej. 12000',
+                      onChanged: model.updateUnitPrice,
+                      inputKind: ProviderFieldInputKind.currency,
+                      errorText: model.fieldError('unit_price_cents'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _PricePreviewCard(cents: model.formData.unitPriceCents),
+                  const SizedBox(height: 10),
+                  _InfoCard(
+                    title: model.formData.unitPriceCents > 0
+                        ? 'Precio actual de referencia'
+                        : 'Precio pendiente de productos',
+                    subtitle: model.formData.unitPriceCents > 0
+                        ? 'Este servicio conserva un precio de referencia mientras se termina de automatizar el calculo desde tus productos.'
+                        : 'Cuando tengas productos publicados, el cliente vera automaticamente el precio mas bajo disponible.',
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'Fotos',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _buildPhotoSummary(model),
+                    style: const TextStyle(
+                      color: AppColors.secondaryText,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _ServiceImagesSection(
+                    model: model,
+                    onAddImage: () => _runImageAction(
+                      context,
+                      model.uploadImage,
+                      successMessage: 'Imagen subida.',
+                    ),
+                    onMarkAsMain: (String imageKey) => _runImageAction(
+                      context,
+                      () => model.markImageAsMain(imageKey),
+                      successMessage: 'Imagen principal actualizada.',
+                    ),
+                    onDeleteImage: (String imageKey) => _runImageAction(
+                      context,
+                      () => model.deleteImage(imageKey),
+                      successMessage: 'Imagen eliminada.',
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed:
+                          model.isBusy ||
+                              model.isUploadingImage ||
+                              !model.canSubmit
+                          ? null
+                          : () => _save(context, model),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromRGBO(125, 139, 114, 1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: model.isBusy
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              'Guardar cambios',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+              ),
             ),
           ),
         );
@@ -218,19 +292,98 @@ class EditServiceView extends StatelessWidget {
     );
   }
 
-  Future<void> _save(
-    BuildContext context,
-    EditServiceViewModel model,
-  ) async {
+  Future<void> _save(BuildContext context, EditServiceViewModel model) async {
     final bool wasUpdated = await model.saveServiceChanges();
-    if (!context.mounted || !wasUpdated) {
+    if (!context.mounted) {
+      return;
+    }
+    if (!wasUpdated) {
+      await _scrollToFirstError(context, model.firstErrorField);
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Servicio actualizado.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Servicio actualizado.')));
     Navigator.of(context).pop(true);
+  }
+
+  Future<void> _toggleStatus(
+    BuildContext context,
+    EditServiceViewModel model,
+  ) async {
+    final String? error = await model.publishOrToggleStatus();
+    if (!context.mounted) {
+      return;
+    }
+    if (error != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    final String label = model.isPublished ? 'publicado' : 'actualizado';
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Estado $label.')));
+  }
+
+  Future<bool> _handleExit(
+    BuildContext context,
+    EditServiceViewModel model,
+  ) async {
+    if (!model.hasPendingChanges) {
+      return true;
+    }
+    final bool? shouldDiscard = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Salir sin guardar'),
+          content: const Text(
+            'Hay cambios sin guardar. Quieres salir y descartarlos?',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Descartar'),
+            ),
+          ],
+        );
+      },
+    );
+    return shouldDiscard ?? false;
+  }
+
+  Future<void> _scrollToFirstError(
+    BuildContext context,
+    String? firstErrorField,
+  ) async {
+    if (firstErrorField == null) {
+      return;
+    }
+    final GlobalKey? key = switch (firstErrorField) {
+      'name' => _nameFieldKey,
+      'subtitle' => _subtitleFieldKey,
+      'category' => _categoryFieldKey,
+      'unit_price_cents' => _priceFieldKey,
+      'description' => _descriptionFieldKey,
+      _ => null,
+    };
+    final BuildContext? targetContext = key?.currentContext;
+    if (targetContext == null) {
+      return;
+    }
+    await Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      alignment: 0.2,
+    );
   }
 
   Future<void> _runImageAction(
@@ -384,11 +537,258 @@ class EditServiceView extends StatelessWidget {
   }
 }
 
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({
-    required this.title,
-    required this.subtitle,
+class _PricePreviewCard extends StatelessWidget {
+  const _PricePreviewCard({required this.cents});
+
+  final int cents;
+
+  @override
+  Widget build(BuildContext context) {
+    final String centsLabel = _formatInteger(cents);
+    final String amountLabel = _formatMxAmount(cents);
+    final bool hasInvalidAmount = cents <= 0;
+    final Color borderColor = hasInvalidAmount
+        ? Colors.orange.withValues(alpha: 0.45)
+        : Colors.transparent;
+    final Color backgroundColor = hasInvalidAmount
+        ? Colors.orange.withValues(alpha: 0.10)
+        : AppColors.backgroundElevated.withValues(alpha: 0.6);
+    final Color textColor = hasInvalidAmount
+        ? Colors.orange.shade800
+        : AppColors.secondaryText;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          if (hasInvalidAmount) ...<Widget>[
+            Text(
+              'Advertencia: el precio debe ser mayor a 0.',
+              style: TextStyle(
+                color: textColor,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
+          Text(
+            'Se enviara: unit_price_cents = $centsLabel',
+            style: TextStyle(
+              color: textColor,
+              fontSize: 12,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Equivalente: $amountLabel MXN',
+            style: TextStyle(color: textColor, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceStatusCard extends StatelessWidget {
+  const _ServiceStatusCard({
+    required this.statusLabel,
+    required this.isPublished,
+    required this.isUpdating,
+    required this.onToggle,
   });
+
+  final String statusLabel;
+  final bool isPublished;
+  final bool isUpdating;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color statusColor = isPublished ? Colors.green : Colors.orange;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              statusLabel,
+              style: TextStyle(
+                color: statusColor,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const Spacer(),
+          FilledButton.tonal(
+            onPressed: isUpdating ? null : onToggle,
+            child: Text(isPublished ? 'Pasar a inactivo' : 'Publicar'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClientPreviewCard extends StatelessWidget {
+  const _ClientPreviewCard({
+    required this.name,
+    required this.subtitle,
+    required this.priceLabel,
+    required this.badge,
+    required this.category,
+  });
+
+  final String name;
+  final String subtitle;
+  final String priceLabel;
+  final String badge;
+  final ServiceCategory? category;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.cardAccent,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'Vista previa en Cliente',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.secondaryText,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: <Widget>[
+              Icon(_iconFor(category), color: AppColors.activeIcon),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (badge.trim().isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondaryButton.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    badge,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppColors.secondaryText),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            priceLabel,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppColors.activeIcon,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _iconFor(ServiceCategory? category) {
+  switch (category) {
+    case ServiceCategory.venue:
+      return Icons.apartment_rounded;
+    case ServiceCategory.furniture:
+    case ServiceCategory.equipment:
+      return Icons.chair_alt_rounded;
+    case ServiceCategory.banquet:
+      return Icons.restaurant_menu_rounded;
+    case ServiceCategory.dj:
+      return Icons.music_note_rounded;
+    case ServiceCategory.decoration:
+      return Icons.celebration_rounded;
+    case ServiceCategory.photography:
+      return Icons.camera_alt_rounded;
+    case ServiceCategory.entertainment:
+      return Icons.theater_comedy_rounded;
+    case null:
+      return Icons.miscellaneous_services_rounded;
+  }
+}
+
+String _formatInteger(int value) {
+  final String raw = value.abs().toString();
+  final StringBuffer buffer = StringBuffer();
+  for (int i = 0; i < raw.length; i++) {
+    final int reverseIndex = raw.length - i;
+    buffer.write(raw[i]);
+    if (reverseIndex > 1 && reverseIndex % 3 == 1) {
+      buffer.write(',');
+    }
+  }
+  final String formatted = buffer.toString();
+  return value < 0 ? '-$formatted' : formatted;
+}
+
+String _formatMxAmount(int cents) {
+  final int whole = cents ~/ 100;
+  final int fraction = cents.abs() % 100;
+  final String wholeLabel = _formatInteger(whole);
+  final String fractionLabel = fraction.toString().padLeft(2, '0');
+  return '\$$wholeLabel.$fractionLabel';
+}
+
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
@@ -492,9 +892,7 @@ class _ServiceImagesSection extends StatelessWidget {
               return _ServiceImageCard(
                 image: image,
                 isMutating: isMutating,
-                onMakeMain: image.isMain
-                    ? null
-                    : () => onMarkAsMain(image.key),
+                onMakeMain: image.isMain ? null : () => onMarkAsMain(image.key),
                 onDelete: () => onDeleteImage(image.key),
               );
             },
@@ -510,10 +908,7 @@ class _ServiceImagesSection extends StatelessWidget {
 }
 
 class _PhotoEmptyCard extends StatelessWidget {
-  const _PhotoEmptyCard({
-    required this.isUploading,
-    required this.onAddImage,
-  });
+  const _PhotoEmptyCard({required this.isUploading, required this.onAddImage});
 
   final bool isUploading;
   final VoidCallback onAddImage;
@@ -593,10 +988,7 @@ class _PhotoEmptyCard extends StatelessWidget {
 }
 
 class _AddPhotoCard extends StatelessWidget {
-  const _AddPhotoCard({
-    required this.isUploading,
-    required this.onTap,
-  });
+  const _AddPhotoCard({required this.isUploading, required this.onTap});
 
   final bool isUploading;
   final VoidCallback onTap;
@@ -757,7 +1149,9 @@ class _ServiceImageCard extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: isMutating || onMakeMain == null ? null : onMakeMain,
-                child: Text(image.isMain ? 'Imagen principal' : 'Usar como principal'),
+                child: Text(
+                  image.isMain ? 'Imagen principal' : 'Usar como principal',
+                ),
               ),
             ),
           ),
