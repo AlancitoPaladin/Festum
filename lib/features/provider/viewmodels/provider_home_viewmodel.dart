@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:festum/core/services/provider_reactivity_service.dart';
+import 'package:festum/features/provider/models/product_reservations_response.dart';
 import 'package:festum/features/provider/models/provider_home_response.dart';
 import 'package:festum/features/provider/models/provider_notification.dart';
 import 'package:festum/features/provider/models/provider_notifications_response.dart';
@@ -8,6 +9,7 @@ import 'package:festum/features/provider/repositories/provider_home_repository.d
 import 'package:festum/features/provider/usecases/clear_provider_notifications_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_home_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_notifications_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_product_reservations_use_case.dart';
 import 'package:festum/features/provider/usecases/mark_all_provider_notifications_as_read_use_case.dart';
 import 'package:festum/features/provider/usecases/mark_provider_notification_as_read_use_case.dart';
 import 'package:stacked/stacked.dart';
@@ -16,6 +18,7 @@ class ProviderHomeViewModel extends BaseViewModel {
   ProviderHomeViewModel(
     this._getProviderHomeUseCase,
     this._getProviderNotificationsUseCase,
+    this._getProviderProductReservationsUseCase,
     this._markProviderNotificationAsReadUseCase,
     this._markAllProviderNotificationsAsReadUseCase,
     this._clearProviderNotificationsUseCase,
@@ -28,6 +31,8 @@ class ProviderHomeViewModel extends BaseViewModel {
 
   final GetProviderHomeUseCase _getProviderHomeUseCase;
   final GetProviderNotificationsUseCase _getProviderNotificationsUseCase;
+  final GetProviderProductReservationsUseCase
+  _getProviderProductReservationsUseCase;
   final MarkProviderNotificationAsReadUseCase
   _markProviderNotificationAsReadUseCase;
   final MarkAllProviderNotificationsAsReadUseCase
@@ -62,11 +67,15 @@ class ProviderHomeViewModel extends BaseViewModel {
       final List<Object> results = await Future.wait<Object>(<Future<Object>>[
         _getProviderHomeUseCase(),
         _getProviderNotificationsUseCase(),
+        _getProviderProductReservationsUseCase(),
       ]);
 
-      _home = results[0] as ProviderHomeResponse;
+      final ProviderHomeResponse homeResponse = results[0] as ProviderHomeResponse;
       final ProviderNotificationsResponse notificationsResponse =
           results[1] as ProviderNotificationsResponse;
+      final List<ProductReservationSummary> reservationProducts =
+          results[2] as List<ProductReservationSummary>;
+      _home = _enrichHome(homeResponse, reservationProducts);
       _notifications = notificationsResponse.items;
       _lastServicesRevision = _providerReactivityService.servicesRevision;
       _lastBusinessRevision = _providerReactivityService.businessRevision;
@@ -145,5 +154,42 @@ class ProviderHomeViewModel extends BaseViewModel {
     }
 
     unawaited(refresh());
+  }
+
+  ProviderHomeResponse _enrichHome(
+    ProviderHomeResponse home,
+    List<ProductReservationSummary> reservationProducts,
+  ) {
+    final Map<String, int> reservationsByServiceId = <String, int>{};
+    for (final ProductReservationSummary item in reservationProducts) {
+      if (item.serviceId.trim().isEmpty || item.nextBooking == null) {
+        continue;
+      }
+      reservationsByServiceId.update(
+        item.serviceId,
+        (int current) => current + 1,
+        ifAbsent: () => 1,
+      );
+    }
+
+    final List<ProviderFeaturedService> featuredServices = home.featuredServices
+        .map((ProviderFeaturedService service) {
+          final String normalizedPrice = _normalizePriceLabel(service.priceLabel);
+          return service.copyWith(
+            reservations: reservationsByServiceId[service.id] ?? service.reservations,
+            priceLabel: normalizedPrice,
+          );
+        })
+        .toList();
+
+    return home.copyWith(featuredServices: featuredServices);
+  }
+
+  String _normalizePriceLabel(String value) {
+    final String normalized = value.trim();
+    if (normalized.isEmpty || normalized.toLowerCase() == 'cotiza') {
+      return 'Precio por definir';
+    }
+    return normalized;
   }
 }

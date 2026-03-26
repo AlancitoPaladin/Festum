@@ -186,21 +186,71 @@ class ManualBookingView extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   _buildField(
-                    label: 'Pago / anticipo',
-                    hint:
-                        'Ej: Anticipo de \$2,000 recibido, resto pendiente',
-                    controller: model.paymentDetailsController,
-                    maxLines: 2,
-                    inputKind: ProviderFieldInputKind.mixedText,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildField(
                     label: 'Notas / detalles extra',
                     hint:
                         'Describe acuerdos especiales, dudas o cosas por confirmar...',
                     controller: model.notesController,
                     maxLines: 3,
                     inputKind: ProviderFieldInputKind.mixedText,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              _buildSectionCard(
+                title: 'Pago',
+                subtitle:
+                    'Registra el monto total y lo que ya recibiste para llevar control del saldo.',
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildField(
+                          label: 'Monto total',
+                          hint: '0.00',
+                          controller: model.totalAmountController,
+                          inputKind: ProviderFieldInputKind.decimal,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildField(
+                          label: 'Monto pagado',
+                          hint: '0.00',
+                          controller: model.paidAmountController,
+                          inputKind: ProviderFieldInputKind.decimal,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundElevated,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'Pendiente',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primaryText,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '\$${model.formatCurrency(model.pendingAmount)}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.appBar,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

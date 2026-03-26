@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:festum/core/network/api_url_resolver.dart';
 import 'package:flutter/material.dart';
 
@@ -32,41 +34,56 @@ class _AppRemoteImageState extends State<AppRemoteImage> {
 
   @override
   Widget build(BuildContext context) {
-    final String resolvedImageUrl = resolveApiAssetUrl(widget.imageUrl);
+    final String rawImageUrl = widget.imageUrl.trim();
+    final bool isLocalFile = _isLocalFilePath(rawImageUrl);
+    final String resolvedImageUrl = isLocalFile
+        ? rawImageUrl
+        : resolveApiAssetUrl(rawImageUrl);
     if (resolvedImageUrl.isEmpty) {
       return _wrap(widget.placeholder);
     }
 
     return _wrap(
-      Image.network(
-        resolvedImageUrl,
-        width: widget.width,
-        height: widget.height,
-        fit: widget.fit,
-        headers: widget.headers,
-        loadingBuilder:
-            (
-              BuildContext context,
-              Widget child,
-              ImageChunkEvent? loadingProgress,
-            ) {
-              if (loadingProgress == null) {
-                return child;
-              }
-              return const Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              );
-            },
-        errorBuilder:
-            (BuildContext context, Object error, StackTrace? stackTrace) {
-              _handleForbidden(error);
-              return widget.placeholder;
-            },
-      ),
+      isLocalFile
+          ? Image.file(
+              _toLocalFile(resolvedImageUrl),
+              width: widget.width,
+              height: widget.height,
+              fit: widget.fit,
+              errorBuilder:
+                  (BuildContext context, Object error, StackTrace? stackTrace) {
+                    return widget.placeholder;
+                  },
+            )
+          : Image.network(
+              resolvedImageUrl,
+              width: widget.width,
+              height: widget.height,
+              fit: widget.fit,
+              headers: widget.headers,
+              loadingBuilder:
+                  (
+                    BuildContext context,
+                    Widget child,
+                    ImageChunkEvent? loadingProgress,
+                  ) {
+                    if (loadingProgress == null) {
+                      return child;
+                    }
+                    return const Center(
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  },
+              errorBuilder:
+                  (BuildContext context, Object error, StackTrace? stackTrace) {
+                    _handleForbidden(error);
+                    return widget.placeholder;
+                  },
+            ),
     );
   }
 
@@ -89,5 +106,32 @@ class _AppRemoteImageState extends State<AppRemoteImage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.onForbidden?.call();
     });
+  }
+
+  bool _isLocalFilePath(String value) {
+    if (value.isEmpty) {
+      return false;
+    }
+    final String normalized = value.toLowerCase();
+    if (normalized.startsWith('file:')) {
+      return true;
+    }
+    if (value.contains('\\')) {
+      return true;
+    }
+    if (RegExp(r'^[a-zA-Z]:[/\\]').hasMatch(value)) {
+      return true;
+    }
+    return normalized.startsWith('/storage/') ||
+        normalized.startsWith('/data/') ||
+        normalized.startsWith('/private/') ||
+        normalized.startsWith('/var/mobile/');
+  }
+
+  File _toLocalFile(String value) {
+    if (value.toLowerCase().startsWith('file:')) {
+      return File.fromUri(Uri.parse(value));
+    }
+    return File(value);
   }
 }

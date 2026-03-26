@@ -1,4 +1,5 @@
 import 'package:festum/core/network/asset_url_safety.dart';
+import 'package:festum/core/network/image_json_resolver.dart';
 import 'package:festum/features/provider/models/provider_service_image.dart';
 import 'package:festum/features/provider/models/provider_signed_asset.dart';
 import 'package:festum/features/provider/models/service_category.dart';
@@ -73,8 +74,12 @@ class ProviderService {
     final Map<String, dynamic>? imagePayload = _asMap(json['image']);
     final String mainImageKey =
         (imagePayload?['key'] ?? json['main_image_key'] ?? '').toString();
-    final String legacyImageUrl =
-        (json['image_url'] ?? json['main_image_url'] ?? '').toString();
+    final String legacyImageUrl = resolveImageUrlFromJson(
+      json,
+      directKeys: const <String>['main_image_url', 'image_url', 'url'],
+      objectKeys: const <String>['main_image', 'image'],
+      listKeys: const <String>['images', 'image_urls'],
+    );
     final List<ProviderServiceImage> images = _parseImages(
       json,
       mainImageKey: mainImageKey,

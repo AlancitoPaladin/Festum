@@ -162,12 +162,27 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
   }
 
   Future<String?> pickLogo() async {
+    final String? previousLogoUrl = _businessInfo.logoUrl;
     return _uploadAsset(
       pickerAction: () =>
           _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 85),
       uploadAction: _uploadProviderBusinessLogoUseCase.call,
-      onUploaded: (String assetUrl) {
+      onPreviewSelected: (String previewUrl) {
+        _businessInfo.logoUrl = previewUrl;
+        _providerBrandingService.sync(
+          businessName: _businessInfo.name,
+          logoUrl: previewUrl,
+        );
+      },
+      onUploaded: (String previewUrl, String assetUrl) {
         _businessInfo.logoUrl = assetUrl;
+      },
+      onUploadFailed: (String previewUrl) {
+        _businessInfo.logoUrl = previousLogoUrl;
+        _providerBrandingService.sync(
+          businessName: _businessInfo.name,
+          logoUrl: previousLogoUrl ?? '',
+        );
       },
     );
   }
@@ -177,9 +192,23 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
       pickerAction: () =>
           _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 85),
       uploadAction: _uploadProviderBusinessPhotoUseCase.call,
-      onUploaded: (String assetUrl) {
+      onPreviewSelected: (String previewUrl) {
         _businessInfo.photoUrls = List<String>.from(_businessInfo.photoUrls)
-          ..add(assetUrl);
+          ..add(previewUrl);
+      },
+      onUploaded: (String previewUrl, String assetUrl) {
+        final List<String> updatedUrls = List<String>.from(_businessInfo.photoUrls);
+        final int previewIndex = updatedUrls.indexOf(previewUrl);
+        if (previewIndex >= 0) {
+          updatedUrls[previewIndex] = assetUrl;
+        } else {
+          updatedUrls.add(assetUrl);
+        }
+        _businessInfo.photoUrls = updatedUrls;
+      },
+      onUploadFailed: (String previewUrl) {
+        _businessInfo.photoUrls = List<String>.from(_businessInfo.photoUrls)
+          ..remove(previewUrl);
       },
     );
   }
@@ -213,18 +242,23 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
     required Future<XFile?> Function() pickerAction,
     required Future<ProviderAssetUploadResponse> Function(String filePath)
     uploadAction,
-    required void Function(String assetUrl) onUploaded,
+    required void Function(String previewUrl) onPreviewSelected,
+    required void Function(String previewUrl, String assetUrl) onUploaded,
+    required void Function(String previewUrl) onUploadFailed,
   }) async {
     if (_isUploadingAsset) {
       return null;
     }
 
+    String? previewUrl;
     try {
       final XFile? selectedFile = await pickerAction();
       if (selectedFile == null) {
         return null;
       }
 
+      previewUrl = selectedFile.path;
+      onPreviewSelected(previewUrl);
       _isUploadingAsset = true;
       notifyListeners();
 
@@ -234,10 +268,11 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
       final String assetUrl = response.assetUrl.trim();
 
       if (assetUrl.isEmpty) {
+        onUploadFailed(previewUrl);
         return 'La API no devolvio una URL valida para el archivo.';
       }
 
-      onUploaded(assetUrl);
+      onUploaded(previewUrl, assetUrl);
       await _providerBrandingService.sync(
         businessName: _businessInfo.name,
         logoUrl: _businessInfo.logoUrl ?? '',
@@ -245,6 +280,9 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
       await _providerReactivityService.notifyBusinessChanged();
       return null;
     } catch (error) {
+      if (previewUrl != null) {
+        onUploadFailed(previewUrl);
+      }
       return ProviderBusinessRepository.mapApiError(error);
     } finally {
       _isUploadingAsset = false;

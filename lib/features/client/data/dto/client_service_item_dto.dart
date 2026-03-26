@@ -1,4 +1,4 @@
-import 'package:festum/core/network/asset_url_safety.dart';
+import 'package:festum/core/network/image_json_resolver.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
 
 class ClientServiceItemDto {
@@ -35,14 +35,17 @@ class ClientServiceItemDto {
     final String imageKey = (imagePayload?['key'] ?? json['image_key'] ?? '')
         .toString()
         .trim();
-    final String imageUrl = sanitizeAssetUrl(
-      ((imagePayload?['url'] ??
-              json['image_url'] ??
-              json['imageUrl'] ??
-              json['asset_url'] ??
-              '')
-          .toString()
-          .trim()),
+    final String imageUrl = resolveImageUrlFromJson(
+      json,
+      directKeys: const <String>[
+        'main_image_url',
+        'image_url',
+        'imageUrl',
+        'asset_url',
+        'url',
+      ],
+      objectKeys: const <String>['main_image', 'image', 'asset'],
+      listKeys: const <String>['images', 'image_urls'],
     );
     final DateTime? imageExpiresAt = _parseDate(
       imagePayload?['expires_at'] ??
@@ -167,8 +170,11 @@ class ClientServiceProductDto {
     );
     final String imageKey =
         (imagePayload?['key'] ?? json['image_key'] ?? '').toString().trim();
-    final String imageUrl = sanitizeAssetUrl(
-      ((imagePayload?['url'] ?? json['image_url'] ?? '').toString().trim()),
+    final String imageUrl = resolveImageUrlFromJson(
+      json,
+      directKeys: const <String>['main_image_url', 'image_url', 'url'],
+      objectKeys: const <String>['main_image', 'image'],
+      listKeys: const <String>['images', 'image_urls'],
     );
     final int unitPriceCents =
         (json['unit_price_cents'] as num?)?.toInt() ??

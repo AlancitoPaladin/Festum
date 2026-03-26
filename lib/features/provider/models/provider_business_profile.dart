@@ -1,4 +1,5 @@
 import 'package:festum/core/network/asset_url_safety.dart';
+import 'package:festum/core/network/image_json_resolver.dart';
 import 'package:festum/features/provider/models/provider_signed_asset.dart';
 
 class ProviderBusinessProfile {
@@ -14,6 +15,7 @@ class ProviderBusinessProfile {
     required this.website,
     required this.logoUrl,
     required this.photoUrls,
+    this.createdAt,
     this.logo,
     this.photos = const <ProviderSignedAsset>[],
   });
@@ -29,6 +31,7 @@ class ProviderBusinessProfile {
   final String website;
   final String logoUrl;
   final List<String> photoUrls;
+  final DateTime? createdAt;
   final ProviderSignedAsset? logo;
   final List<ProviderSignedAsset> photos;
 
@@ -36,9 +39,11 @@ class ProviderBusinessProfile {
     final Map<String, dynamic> source = _resolveSource(json);
     final ProviderSignedAsset? logo = _parseLogo(source);
     final List<ProviderSignedAsset> photos = _parsePhotos(source);
-    final String fallbackLogoUrl = sanitizeAssetUrl(
-      (source['logo_url'] ?? source['logoUrl'] ?? source['logo'] ?? '')
-          .toString(),
+    final String fallbackLogoUrl = resolveImageUrlFromJson(
+      source,
+      directKeys: const <String>['logo_url', 'image_url', 'asset_url', 'url'],
+      objectKeys: const <String>['logo', 'asset', 'image'],
+      listKeys: const <String>['photos', 'photo_urls', 'images'],
     );
     final List<String> fallbackPhotoUrls = _parseLegacyPhotoUrls(source);
 
@@ -63,6 +68,9 @@ class ProviderBusinessProfile {
                 .map((ProviderSignedAsset item) => item.url)
                 .toList()
           : fallbackPhotoUrls,
+      createdAt: _parseDateTime(
+        source['created_at'] ?? source['createdAt'] ?? source['member_since'],
+      ),
       logo: logo,
       photos: photos,
     );
@@ -98,16 +106,10 @@ class ProviderBusinessProfile {
   }
 
   static List<String> _parseLegacyPhotoUrls(Map<String, dynamic> source) {
-    final dynamic photoUrls =
-        source['photo_urls'] ?? source['photoUrls'] ?? source['photos'];
-    if (photoUrls is List) {
-      return photoUrls
-          .whereType<String>()
-          .map(sanitizeAssetUrl)
-          .where((String item) => item.isNotEmpty)
-          .toList();
-    }
-    return <String>[];
+    return resolveImageUrlsFromJson(
+      source,
+      listKeys: const <String>['photo_urls', 'photoUrls', 'photos', 'images'],
+    );
   }
 
   static List<ProviderSignedAsset> _parsePhotos(Map<String, dynamic> source) {
@@ -180,6 +182,7 @@ class ProviderBusinessProfile {
       'website': website,
       'logo_url': logoUrl,
       'photo_urls': photoUrls,
+      'created_at': createdAt?.toIso8601String(),
       if (logo != null) 'logo': logo!.toJson(),
       if (photos.isNotEmpty)
         'photos': photos
@@ -200,6 +203,7 @@ class ProviderBusinessProfile {
     String? website,
     String? logoUrl,
     List<String>? photoUrls,
+    DateTime? createdAt,
     ProviderSignedAsset? logo,
     List<ProviderSignedAsset>? photos,
   }) {
@@ -215,8 +219,17 @@ class ProviderBusinessProfile {
       website: website ?? this.website,
       logoUrl: logoUrl ?? this.logoUrl,
       photoUrls: photoUrls ?? this.photoUrls,
+      createdAt: createdAt ?? this.createdAt,
       logo: logo ?? this.logo,
       photos: photos ?? this.photos,
     );
   }
+}
+
+DateTime? _parseDateTime(Object? value) {
+  final String raw = (value ?? '').toString().trim();
+  if (raw.isEmpty) {
+    return null;
+  }
+  return DateTime.tryParse(raw);
 }

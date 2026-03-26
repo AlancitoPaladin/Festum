@@ -194,8 +194,8 @@ class MyServicesView extends StatelessWidget {
           title: Text(willPublish ? 'Publicar servicio' : 'Inactivar servicio'),
           content: Text(
             willPublish
-                ? 'Al publicarlo, "$service.name" podra verse en Client despues de refrescar.'
-                : 'El servicio dejara de verse en Client hasta volver a publicarlo.',
+                ? 'Al publicar este servicio, los clientes podran verlo en la app despues de actualizar la informacion.'
+                : 'Al inactivar este servicio, dejara de estar disponible para los clientes hasta que lo vuelvas a publicar.',
           ),
           actions: <Widget>[
             TextButton(

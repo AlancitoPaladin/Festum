@@ -1,4 +1,4 @@
-import 'package:festum/core/network/asset_url_safety.dart';
+import 'package:festum/core/network/image_json_resolver.dart';
 
 class ProviderHomeResponse {
   const ProviderHomeResponse({
@@ -18,16 +18,16 @@ class ProviderHomeResponse {
   final List<ProviderFeaturedService> featuredServices;
 
   factory ProviderHomeResponse.fromJson(Map<String, dynamic> json) {
-    final Map<String, dynamic>? avatarPayload = _asMap(json['avatar']);
-    final String rawAvatarUrl =
-        (avatarPayload?['url'] ?? json['avatar_url'] ?? json['avatarUrl'] ?? '')
-            .toString();
-
     return ProviderHomeResponse(
       providerId: (json['provider_id'] ?? '').toString(),
       displayName: (json['display_name'] ?? '').toString(),
       businessName: (json['business_name'] ?? '').toString(),
-      avatarUrl: sanitizeAssetUrl(rawAvatarUrl),
+      avatarUrl: resolveImageUrlFromJson(
+        json,
+        directKeys: const <String>['avatar_url', 'image_url', 'url'],
+        objectKeys: const <String>['avatar', 'image'],
+        listKeys: const <String>['images'],
+      ),
       quickStats: ProviderQuickStats.fromJson(
         Map<String, dynamic>.from(
           (json['quick_stats'] as Map<dynamic, dynamic>? ??
@@ -47,14 +47,22 @@ class ProviderHomeResponse {
     );
   }
 
-  static Map<String, dynamic>? _asMap(dynamic value) {
-    if (value is Map<String, dynamic>) {
-      return value;
-    }
-    if (value is Map) {
-      return Map<String, dynamic>.from(value);
-    }
-    return null;
+  ProviderHomeResponse copyWith({
+    String? providerId,
+    String? displayName,
+    String? businessName,
+    String? avatarUrl,
+    ProviderQuickStats? quickStats,
+    List<ProviderFeaturedService>? featuredServices,
+  }) {
+    return ProviderHomeResponse(
+      providerId: providerId ?? this.providerId,
+      displayName: displayName ?? this.displayName,
+      businessName: businessName ?? this.businessName,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      quickStats: quickStats ?? this.quickStats,
+      featuredServices: featuredServices ?? this.featuredServices,
+    );
   }
 }
 
@@ -95,15 +103,6 @@ class ProviderFeaturedService {
   final String imageUrl;
 
   factory ProviderFeaturedService.fromJson(Map<String, dynamic> json) {
-    final Map<String, dynamic>? imagePayload = _asMap(json['image']);
-    final String rawImageUrl =
-        (imagePayload?['url'] ??
-                json['image_url'] ??
-                json['imageUrl'] ??
-                json['asset_url'] ??
-                '')
-            .toString();
-
     return ProviderFeaturedService(
       id: (json['id'] ?? '').toString(),
       title: (json['title'] ?? '').toString(),
@@ -111,18 +110,38 @@ class ProviderFeaturedService {
       status: (json['status'] ?? '').toString(),
       priceLabel: (json['price_label'] ?? '').toString(),
       reservations: _toInt(json['reservations']),
-      imageUrl: sanitizeAssetUrl(rawImageUrl),
+      imageUrl: resolveImageUrlFromJson(
+        json,
+        directKeys: const <String>[
+          'main_image_url',
+          'image_url',
+          'asset_url',
+          'url',
+        ],
+        objectKeys: const <String>['main_image', 'image', 'asset'],
+        listKeys: const <String>['images', 'image_urls'],
+      ),
     );
   }
 
-  static Map<String, dynamic>? _asMap(dynamic value) {
-    if (value is Map<String, dynamic>) {
-      return value;
-    }
-    if (value is Map) {
-      return Map<String, dynamic>.from(value);
-    }
-    return null;
+  ProviderFeaturedService copyWith({
+    String? id,
+    String? title,
+    String? category,
+    String? status,
+    String? priceLabel,
+    int? reservations,
+    String? imageUrl,
+  }) {
+    return ProviderFeaturedService(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      status: status ?? this.status,
+      priceLabel: priceLabel ?? this.priceLabel,
+      reservations: reservations ?? this.reservations,
+      imageUrl: imageUrl ?? this.imageUrl,
+    );
   }
 }
 

@@ -1,4 +1,5 @@
 import 'package:festum/core/network/asset_url_safety.dart';
+import 'package:festum/core/network/image_json_resolver.dart';
 import 'package:festum/features/provider/models/provider_product_image.dart';
 import 'package:festum/features/provider/models/provider_signed_asset.dart';
 import 'package:festum/features/provider/models/service_category.dart';
@@ -86,13 +87,16 @@ class ProviderProduct {
 
   factory ProviderProduct.fromJson(Map<String, dynamic> json) {
     final Map<String, dynamic>? imagePayload = _asMap(json['image']);
-    final String legacyMainImageUrl =
-        (json['main_image_url'] ?? json['image_url'] ?? '').toString().trim();
-    final List<String> legacyImageUrls =
-        ((json['image_urls'] as List<dynamic>? ?? <dynamic>[])
-            .map((dynamic item) => item.toString().trim())
-            .where((String item) => item.isNotEmpty)
-            .toList());
+    final String legacyMainImageUrl = resolveImageUrlFromJson(
+      json,
+      directKeys: const <String>['main_image_url', 'image_url', 'url'],
+      objectKeys: const <String>['main_image', 'image'],
+      listKeys: const <String>['images', 'image_urls'],
+    );
+    final List<String> legacyImageUrls = resolveImageUrlsFromJson(
+      json,
+      listKeys: const <String>['image_urls', 'images'],
+    );
 
     final List<ProviderProductImage> images = _parseImages(
       json,

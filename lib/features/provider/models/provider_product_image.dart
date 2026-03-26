@@ -1,4 +1,5 @@
 import 'package:festum/core/network/asset_url_safety.dart';
+import 'package:festum/core/network/image_json_resolver.dart';
 import 'package:festum/features/provider/models/provider_signed_asset.dart';
 
 class ProviderProductImage {
@@ -53,13 +54,17 @@ class ProviderProductImage {
             .trim();
 
     final String legacyImageUrl =
-        (json['image_url'] ??
-                json['url'] ??
-                imagePayload?['url'] ??
-                asset?.url ??
-                '')
-            .toString()
-            .trim();
+        resolveImageUrlFromJson(
+          json,
+          directKeys: const <String>[
+            'main_image_url',
+            'image_url',
+            'url',
+            'asset_url',
+          ],
+          objectKeys: const <String>['main_image', 'image', 'asset'],
+          listKeys: const <String>['images', 'image_urls'],
+        );
 
     return ProviderProductImage(
       key: key,

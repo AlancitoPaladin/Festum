@@ -1,4 +1,5 @@
 import 'package:festum/features/provider/models/provider_signed_asset.dart';
+import 'package:festum/core/network/image_json_resolver.dart';
 
 class ProviderAssetUploadResponse {
   const ProviderAssetUploadResponse({
@@ -28,13 +29,18 @@ class ProviderAssetUploadResponse {
           .toString(),
       assetUrl: asset?.url.isNotEmpty == true
           ? asset!.url
-          : (source['asset_url'] ??
-                    source['assetUrl'] ??
-                    source['logo_url'] ??
-                    source['logoUrl'] ??
-                    source['url'] ??
-                    '')
-                .toString(),
+          : resolveImageUrlFromJson(
+              source,
+              directKeys: const <String>[
+                'asset_url',
+                'logo_url',
+                'image_url',
+                'main_image_url',
+                'url',
+              ],
+              objectKeys: const <String>['asset', 'logo', 'image'],
+              listKeys: const <String>['images', 'image_urls', 'photos'],
+            ),
       asset: asset,
     );
   }

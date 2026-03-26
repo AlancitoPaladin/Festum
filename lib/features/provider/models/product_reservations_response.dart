@@ -25,9 +25,8 @@ class ProductReservationSummary {
       id: (json['id'] ?? '').toString(),
       serviceId: (json['service_id'] ?? '').toString(),
       productName: ((json['product_name'] ?? json['name']) ?? '').toString(),
-      category: ServiceCategory.values.firstWhere(
-        (ServiceCategory item) => item.name == json['category'],
-        orElse: () => ServiceCategory.dj,
+      category: ServiceCategory.fromProviderApiValue(
+        (json['category'] ?? '').toString(),
       ),
       imageUrl: _resolveImageUrl(
         json,

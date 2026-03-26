@@ -188,6 +188,7 @@ class EditServiceViewModel extends BaseViewModel {
       return null;
     }
 
+    String? previewKey;
     try {
       final XFile? selectedFile = await _imagePicker.pickImage(
         source: ImageSource.gallery,
@@ -197,6 +198,19 @@ class EditServiceViewModel extends BaseViewModel {
         return null;
       }
 
+      previewKey =
+          'local:${DateTime.now().microsecondsSinceEpoch}:${selectedFile.path}';
+      final bool isFirstImage = _images.isEmpty;
+      _mergeUploadedImage(
+        ProviderServiceImage.fromJson(
+          <String, dynamic>{
+            'key': previewKey,
+            'image_url': selectedFile.path,
+            'is_main': isFirstImage,
+          },
+          fallbackIsMain: isFirstImage,
+        ),
+      );
       _isUploadingImage = true;
       _generalErrorMessage = null;
       notifyListeners();
@@ -211,12 +225,18 @@ class EditServiceViewModel extends BaseViewModel {
       _mergeUploadedImage(
         response.image.copyWith(
           key: response.key,
-          isMain: response.isMain || _images.isEmpty,
+          isMain: response.isMain || isFirstImage,
         ),
       );
+      _images.removeWhere((ProviderServiceImage image) => image.key == previewKey);
+      _syncFormDataImages();
       await _providerReactivityService.notifyServicesChanged();
       return null;
     } catch (error) {
+      if (previewKey != null) {
+        _images.removeWhere((ProviderServiceImage image) => image.key == previewKey);
+      }
+      _syncFormDataImages();
       return ProviderServicesRepository.mapApiError(
         error,
         fallbackMessage: 'No se pudo subir la imagen.',

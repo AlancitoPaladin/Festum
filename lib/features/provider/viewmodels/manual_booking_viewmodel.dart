@@ -29,11 +29,14 @@ class ManualBookingViewModel extends BaseViewModel {
     contactPhoneController.text = initialBooking?.customerPhone ?? '';
     contactEmailController.text = initialBooking?.contactEmail ?? '';
     eventLocationController.text = initialBooking?.eventLocation ?? '';
-    paymentDetailsController.text = initialBooking?.paymentDetails ?? '';
     notesController.text = initialBooking?.notes ?? '';
+    totalAmountController.text = _initialTextAmount(initialBooking?.totalAmount);
+    paidAmountController.text = _initialTextAmount(initialBooking?.paidAmount);
     hasSpecificSchedule = _hasSchedule(initialBooking);
     startTime = _readStartTime(initialBooking?.time);
     endTime = _readEndTime(initialBooking?.time);
+    totalAmountController.addListener(_handleAmountChanged);
+    paidAmountController.addListener(_handleAmountChanged);
   }
 
   final String productId;
@@ -48,9 +51,9 @@ class ManualBookingViewModel extends BaseViewModel {
   final TextEditingController contactPhoneController = TextEditingController();
   final TextEditingController contactEmailController = TextEditingController();
   final TextEditingController eventLocationController = TextEditingController();
-  final TextEditingController paymentDetailsController =
-      TextEditingController();
   final TextEditingController notesController = TextEditingController();
+  final TextEditingController totalAmountController = TextEditingController();
+  final TextEditingController paidAmountController = TextEditingController();
 
   DateTime? selectedDate;
   bool hasSpecificSchedule = false;
@@ -68,6 +71,13 @@ class ManualBookingViewModel extends BaseViewModel {
   String get introText => isEditMode
       ? 'Actualiza la informacion de la reserva sin cambiar la experiencia visual del flujo actual.'
       : 'Registra una reserva externa para bloquear la fecha en tu calendario.';
+
+  double get totalAmount => _parseAmount(totalAmountController.text);
+  double get paidAmount => _parseAmount(paidAmountController.text);
+  double get pendingAmount {
+    final double pending = totalAmount - paidAmount;
+    return pending < 0 ? 0 : pending;
+  }
 
   void setDate(DateTime date) {
     selectedDate = date;
@@ -122,9 +132,9 @@ class ManualBookingViewModel extends BaseViewModel {
                 contactPhone: contactPhoneController.text,
                 contactEmail: contactEmailController.text,
                 eventLocation: eventLocationController.text,
-                paymentDetails: paymentDetailsController.text,
-                totalAmount: _initialBooking!.totalAmount,
-                paidAmount: _initialBooking!.paidAmount,
+                paymentDetails: '',
+                totalAmount: totalAmount,
+                paidAmount: paidAmount,
                 notes: notesController.text,
               ),
             )
@@ -142,9 +152,9 @@ class ManualBookingViewModel extends BaseViewModel {
                 contactPhone: contactPhoneController.text,
                 contactEmail: contactEmailController.text,
                 eventLocation: eventLocationController.text,
-                paymentDetails: paymentDetailsController.text,
-                totalAmount: 0,
-                paidAmount: 0,
+                paymentDetails: '',
+                totalAmount: totalAmount,
+                paidAmount: paidAmount,
                 notes: notesController.text,
               ),
             );
@@ -175,6 +185,12 @@ class ManualBookingViewModel extends BaseViewModel {
     if (eventTypeController.text.trim().isEmpty) {
       return 'Ingresa el tipo de evento.';
     }
+    if (totalAmount < 0 || paidAmount < 0) {
+      return 'Los montos no pueden ser negativos.';
+    }
+    if (paidAmount > totalAmount) {
+      return 'El monto pagado no puede ser mayor al total.';
+    }
     if (hasSpecificSchedule) {
       if (startTime == null || endTime == null) {
         return 'Selecciona hora de inicio y fin.';
@@ -189,6 +205,8 @@ class ManualBookingViewModel extends BaseViewModel {
   }
 
   int get _parsedGuests => int.tryParse(guestsController.text.trim()) ?? 0;
+
+  String formatCurrency(double value) => value.toStringAsFixed(2);
 
   String _formatTime(TimeOfDay? time) {
     if (time == null) {
@@ -205,6 +223,11 @@ class ManualBookingViewModel extends BaseViewModel {
     }
   }
 
+  void _handleAmountChanged() {
+    _clearError();
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     customerNameController.dispose();
@@ -213,10 +236,28 @@ class ManualBookingViewModel extends BaseViewModel {
     contactPhoneController.dispose();
     contactEmailController.dispose();
     eventLocationController.dispose();
-    paymentDetailsController.dispose();
     notesController.dispose();
+    totalAmountController.removeListener(_handleAmountChanged);
+    paidAmountController.removeListener(_handleAmountChanged);
+    totalAmountController.dispose();
+    paidAmountController.dispose();
     super.dispose();
   }
+}
+
+String _initialTextAmount(double? value) {
+  if (value == null || value <= 0) {
+    return '';
+  }
+  if (value == value.roundToDouble()) {
+    return value.toStringAsFixed(0);
+  }
+  return value.toStringAsFixed(2);
+}
+
+double _parseAmount(String value) {
+  final String normalized = value.trim().replaceAll(',', '.');
+  return double.tryParse(normalized) ?? 0;
 }
 
 bool _hasSchedule(Booking? booking) {

@@ -1,8 +1,8 @@
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
-import 'package:festum/core/network/api_url_resolver.dart';
 import 'package:festum/core/services/auth_state_service.dart';
 import 'package:festum/core/theme/app_colors.dart';
+import 'package:festum/core/widgets/app_remote_image.dart';
 import 'package:festum/core/widgets/custom_app_bar.dart';
 import 'package:festum/features/provider/usecases/get_provider_business_profile_use_case.dart';
 import 'package:festum/features/provider/usecases/save_provider_business_profile_use_case.dart';
@@ -21,13 +21,6 @@ Map<String, String>? _authorizedImageHeaders() {
     return null;
   }
   return <String, String>{'Authorization': 'Bearer $token'};
-}
-
-bool _isHttp403ImageError(Object error) {
-  final String message = error.toString().toLowerCase();
-  return message.contains('statuscode: 403') ||
-      message.contains('status code: 403') ||
-      message.contains('403');
 }
 
 class ProviderBusinessInfoView extends StatelessWidget {
@@ -369,7 +362,7 @@ class _LogoUploadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String resolvedImageUrl = resolveApiAssetUrl(imageUrl ?? '');
+    final String rawImageUrl = (imageUrl ?? '').trim();
     final Map<String, String>? headers = _authorizedImageHeaders();
 
     return InkWell(
@@ -393,52 +386,22 @@ class _LogoUploadCard extends StatelessWidget {
                   color: AppColors.backgroundElevated,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: resolvedImageUrl.isEmpty
+                child: rawImageUrl.isEmpty
                     ? const Icon(
                         Icons.add_a_photo_outlined,
                         color: AppColors.secondaryText,
                       )
-                    : Image.network(
-                        resolvedImageUrl,
+                    : AppRemoteImage(
+                        imageUrl: rawImageUrl,
                         fit: BoxFit.cover,
+                        width: 72,
+                        height: 72,
                         headers: headers,
-                        loadingBuilder:
-                            (
-                              BuildContext context,
-                              Widget child,
-                              ImageChunkEvent? loadingProgress,
-                            ) {
-                              if (loadingProgress == null) {
-                                return child;
-                              }
-                              return const Center(
-                                child: SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              );
-                            },
-                        errorBuilder:
-                            (
-                              BuildContext context,
-                              Object error,
-                              StackTrace? stackTrace,
-                            ) {
-                              if (_isHttp403ImageError(error)) {
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) {
-                                  onForbiddenImage();
-                                });
-                              }
-                              return const Icon(
-                                Icons.broken_image_outlined,
-                                color: AppColors.secondaryText,
-                              );
-                            },
+                        onForbidden: onForbiddenImage,
+                        placeholder: const Icon(
+                          Icons.broken_image_outlined,
+                          color: AppColors.secondaryText,
+                        ),
                       ),
               ),
             ),
@@ -448,7 +411,7 @@ class _LogoUploadCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    resolvedImageUrl.isEmpty
+                    rawImageUrl.isEmpty
                         ? 'Anadir logo del negocio'
                         : 'Cambiar logo del negocio',
                     style: const TextStyle(
@@ -595,7 +558,7 @@ class _ImageUploadSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String resolvedImageUrl = resolveApiAssetUrl(imageUrl ?? '');
+    final String rawImageUrl = (imageUrl ?? '').trim();
     final Map<String, String>? headers = _authorizedImageHeaders();
 
     return InkWell(
@@ -610,9 +573,9 @@ class _ImageUploadSlot extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: Center(
-            child: isAddButton
-                ? isUploading
+          child: isAddButton
+              ? Center(
+                  child: isUploading
                       ? const SizedBox(
                           width: 28,
                           height: 28,
@@ -622,69 +585,37 @@ class _ImageUploadSlot extends StatelessWidget {
                           Icons.add,
                           size: 32,
                           color: Color.fromRGBO(125, 139, 114, 1),
-                        )
-                : resolvedImageUrl.isEmpty
-                ? Container(
-                    width: 80,
-                    height: 100,
-                    decoration: BoxDecoration(
+                        ),
+                )
+              : rawImageUrl.isEmpty
+              ? Container(
+                  width: 80,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundElevated.withValues(
+                      alpha: 0.5,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                )
+              : SizedBox.expand(
+                  child: AppRemoteImage(
+                    imageUrl: rawImageUrl,
+                    fit: BoxFit.cover,
+                    headers: headers,
+                    onForbidden: onForbiddenImage,
+                    placeholder: Container(
                       color: AppColors.backgroundElevated.withValues(
                         alpha: 0.5,
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.broken_image_outlined,
+                        color: AppColors.secondaryText,
+                      ),
                     ),
-                  )
-                : Image.network(
-                    resolvedImageUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    headers: headers,
-                    loadingBuilder:
-                        (
-                          BuildContext context,
-                          Widget child,
-                          ImageChunkEvent? loadingProgress,
-                        ) {
-                          if (loadingProgress == null) {
-                            return child;
-                          }
-                          return const Center(
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          );
-                        },
-                    errorBuilder:
-                        (
-                          BuildContext context,
-                          Object error,
-                          StackTrace? stackTrace,
-                        ) {
-                          if (_isHttp403ImageError(error)) {
-                            final Future<void> Function()? callback =
-                                onForbiddenImage;
-                            if (callback != null) {
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                callback();
-                              });
-                            }
-                          }
-                          return Container(
-                            color: AppColors.backgroundElevated.withValues(
-                              alpha: 0.5,
-                            ),
-                            alignment: Alignment.center,
-                            child: const Icon(
-                              Icons.broken_image_outlined,
-                              color: AppColors.secondaryText,
-                            ),
-                          );
-                        },
                   ),
-          ),
+                ),
         ),
       ),
     );

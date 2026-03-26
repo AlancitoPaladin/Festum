@@ -1,3 +1,5 @@
+import 'package:festum/core/network/image_json_resolver.dart';
+
 class ServiceProduct {
   const ServiceProduct({
     required this.id,
@@ -16,12 +18,6 @@ class ServiceProduct {
   final String imageUrl;
 
   factory ServiceProduct.fromJson(Map<String, dynamic> json) {
-    final List<String> imageUrls =
-        ((json['image_urls'] as List<dynamic>? ?? <dynamic>[])
-            .map((dynamic item) => item.toString().trim())
-            .where((String item) => item.isNotEmpty)
-            .toList());
-
     final dynamic rawPrice = json['price'];
     final double parsedPrice = rawPrice is num
         ? rawPrice.toDouble()
@@ -33,9 +29,12 @@ class ServiceProduct {
       name: (json['name'] ?? '').toString(),
       price: parsedPrice,
       detail: (json['description'] ?? '').toString(),
-      imageUrl: (json['main_image_url'] ?? '').toString().trim().isNotEmpty
-          ? (json['main_image_url'] ?? '').toString().trim()
-          : (imageUrls.isNotEmpty ? imageUrls.first : ''),
+      imageUrl: resolveImageUrlFromJson(
+        json,
+        directKeys: const <String>['main_image_url', 'image_url', 'url'],
+        objectKeys: const <String>['main_image', 'image'],
+        listKeys: const <String>['images', 'image_urls'],
+      ),
     );
   }
 }

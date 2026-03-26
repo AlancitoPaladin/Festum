@@ -9,6 +9,7 @@ import 'package:festum/features/provider/models/provider_tab.dart';
 import 'package:festum/features/provider/usecases/clear_provider_notifications_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_home_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_notifications_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_product_reservations_use_case.dart';
 import 'package:festum/features/provider/usecases/mark_all_provider_notifications_as_read_use_case.dart';
 import 'package:festum/features/provider/usecases/mark_provider_notification_as_read_use_case.dart';
 import 'package:festum/features/provider/viewmodels/provider_home_viewmodel.dart';
@@ -68,6 +69,7 @@ class _HomeTabBody extends StatelessWidget {
       viewModelBuilder: () => ProviderHomeViewModel(
         locator<GetProviderHomeUseCase>(),
         locator<GetProviderNotificationsUseCase>(),
+        locator<GetProviderProductReservationsUseCase>(),
         locator<MarkProviderNotificationAsReadUseCase>(),
         locator<MarkAllProviderNotificationsAsReadUseCase>(),
         locator<ClearProviderNotificationsUseCase>(),

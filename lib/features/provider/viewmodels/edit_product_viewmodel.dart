@@ -232,6 +232,7 @@ class EditProductViewModel extends BaseViewModel {
       return null;
     }
 
+    String? previewKey;
     try {
       final XFile? selectedFile = await _imagePicker.pickImage(
         source: ImageSource.gallery,
@@ -241,6 +242,19 @@ class EditProductViewModel extends BaseViewModel {
         return null;
       }
 
+      previewKey =
+          'local:${DateTime.now().microsecondsSinceEpoch}:${selectedFile.path}';
+      final bool isFirstImage = _images.isEmpty;
+      _mergeUploadedImage(
+        ProviderProductImage.fromJson(
+          <String, dynamic>{
+            'key': previewKey,
+            'image_url': selectedFile.path,
+            'is_main': isFirstImage,
+          },
+          fallbackIsMain: isFirstImage,
+        ),
+      );
       _isUploadingImage = true;
       _generalErrorMessage = null;
       notifyListeners();
@@ -255,13 +269,19 @@ class EditProductViewModel extends BaseViewModel {
       _mergeUploadedImage(
         response.image.copyWith(
           key: response.key,
-          isMain: response.isMain || _images.isEmpty,
+          isMain: response.isMain || isFirstImage,
         ),
       );
+      _images.removeWhere((ProviderProductImage image) => image.key == previewKey);
+      _syncProductImages();
       await _providerReactivityService.notifyProductsChanged();
       await _providerReactivityService.notifyServicesChanged();
       return null;
     } catch (error) {
+      if (previewKey != null) {
+        _images.removeWhere((ProviderProductImage image) => image.key == previewKey);
+      }
+      _syncProductImages();
       return ProviderProductsRepository.mapApiError(
         error,
         fallbackMessage: 'No se pudo subir la imagen.',
