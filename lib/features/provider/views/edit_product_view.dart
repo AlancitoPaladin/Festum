@@ -20,10 +20,7 @@ import 'package:flutter/services.dart';
 import 'package:stacked/stacked.dart';
 
 class EditProductView extends StatelessWidget {
-  const EditProductView({
-    super.key,
-    required this.productId,
-  });
+  const EditProductView({super.key, required this.productId});
 
   final String productId;
 
@@ -32,7 +29,8 @@ class EditProductView extends StatelessWidget {
     return ViewModelBuilder<EditProductViewModel>.reactive(
       viewModelBuilder: () => EditProductViewModel(
         productId: productId,
-        getProviderProductDetailUseCase: locator<GetProviderProductDetailUseCase>(),
+        getProviderProductDetailUseCase:
+            locator<GetProviderProductDetailUseCase>(),
         updateProviderProductUseCase: locator<UpdateProviderProductUseCase>(),
         updateProviderProductStatusUseCase:
             locator<UpdateProviderProductStatusUseCase>(),
@@ -124,7 +122,7 @@ class EditProductView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                _buildSectionTitle('Descripcion'),
+                _buildSectionTitle('Descripción'),
                 _buildTextField(
                   '',
                   'Describe lo que ofreces...',
@@ -278,12 +276,11 @@ class EditProductView extends StatelessWidget {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildDropdown(
-                  'Tipo de precio',
-                  data.pricingUnit,
-                  ['Por evento', 'Por hora', 'Por persona'],
-                  model.updatePricingUnit,
-                ),
+                child: _buildDropdown('Tipo de precio', data.pricingUnit, [
+                  'Por evento',
+                  'Por hora',
+                  'Por persona',
+                ], model.updatePricingUnit),
               ),
             ],
           ),
@@ -693,10 +690,7 @@ class EditProductView extends StatelessWidget {
             inputFormatters: <TextInputFormatter>[
               ...ProviderFieldInput.formatters(inputKind),
             ],
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.primaryText,
-            ),
+            style: const TextStyle(fontSize: 14, color: AppColors.primaryText),
             decoration: InputDecoration(
               border: InputBorder.none,
               hintText: hint,
@@ -740,10 +734,7 @@ class EditProductView extends StatelessWidget {
                   .map(
                     (item) => DropdownMenuItem<String>(
                       value: item,
-                      child: Text(
-                        item,
-                        style: const TextStyle(fontSize: 13),
-                      ),
+                      child: Text(item, style: const TextStyle(fontSize: 13)),
                     ),
                   )
                   .toList(),
@@ -848,10 +839,7 @@ class _StatusHeader extends StatelessWidget {
             ),
             child: Text(
               label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: color, fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(width: 12),
@@ -931,10 +919,7 @@ class _ProductImagesSection extends StatelessWidget {
 }
 
 class _PhotoEmptyCard extends StatelessWidget {
-  const _PhotoEmptyCard({
-    required this.isUploading,
-    required this.onAddImage,
-  });
+  const _PhotoEmptyCard({required this.isUploading, required this.onAddImage});
 
   final bool isUploading;
   final VoidCallback onAddImage;
@@ -953,7 +938,7 @@ class _PhotoEmptyCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Todavia no agregas fotos',
+            'Todavía no agregas fotos',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: AppColors.primaryText,
@@ -961,11 +946,8 @@ class _PhotoEmptyCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Sube una imagen principal para que el producto se vea en Client cuando este publicado.',
-            style: TextStyle(
-              color: AppColors.secondaryText,
-              height: 1.35,
-            ),
+            'Sube una imagen principal para que el producto se vea en Client cuando esté publicado.',
+            style: TextStyle(color: AppColors.secondaryText, height: 1.35),
           ),
           const SizedBox(height: 16),
           OutlinedButton.icon(
@@ -986,10 +968,7 @@ class _PhotoEmptyCard extends StatelessWidget {
 }
 
 class _AddPhotoCard extends StatelessWidget {
-  const _AddPhotoCard({
-    required this.isUploading,
-    required this.onTap,
-  });
+  const _AddPhotoCard({required this.isUploading, required this.onTap});
 
   final bool isUploading;
   final VoidCallback onTap;
@@ -1139,7 +1118,9 @@ class _ProductImageCard extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: isMutating || onMakeMain == null ? null : onMakeMain,
-                child: Text(image.isMain ? 'Imagen principal' : 'Usar como principal'),
+                child: Text(
+                  image.isMain ? 'Imagen principal' : 'Usar como principal',
+                ),
               ),
             ),
           ),

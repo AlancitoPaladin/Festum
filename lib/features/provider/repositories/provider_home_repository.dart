@@ -14,8 +14,8 @@ class ProviderHomeRepository {
   }
 
   Future<ProviderNotificationsResponse> fetchNotifications() async {
-    final Map<String, dynamic> response =
-        await _apiClient.getProviderNotifications();
+    final Map<String, dynamic> response = await _apiClient
+        .getProviderNotifications();
     return ProviderNotificationsResponse.fromJson(response);
   }
 
@@ -48,6 +48,6 @@ class ProviderHomeRepository {
       return error.message;
     }
 
-    return 'Ocurrio un error inesperado.';
+    return 'Ocurrió un error inesperado.';
   }
 }

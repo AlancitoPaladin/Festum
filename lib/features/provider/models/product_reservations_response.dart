@@ -7,6 +7,7 @@ class ProductReservationSummary {
   const ProductReservationSummary({
     required this.id,
     required this.serviceId,
+    required this.serviceName,
     required this.productName,
     required this.category,
     required this.imageUrl,
@@ -16,6 +17,7 @@ class ProductReservationSummary {
 
   final String id;
   final String serviceId;
+  final String serviceName;
   final String productName;
   final ServiceCategory category;
   final String imageUrl;
@@ -26,6 +28,8 @@ class ProductReservationSummary {
     return ProductReservationSummary(
       id: (json['id'] ?? '').toString(),
       serviceId: (json['service_id'] ?? '').toString(),
+      serviceName: ((json['service_name'] ?? json['service_title']) ?? '')
+          .toString(),
       productName: ((json['product_name'] ?? json['name']) ?? '').toString(),
       category: ServiceCategory.fromProviderApiValue(
         (json['category'] ?? '').toString(),
@@ -53,12 +57,43 @@ class ProductReservationSummary {
     return <String, dynamic>{
       'id': id,
       'service_id': serviceId,
+      'service_name': serviceName,
       'product_name': productName,
       'category': category.name,
       'image_url': imageUrl,
       'next_booking': nextBooking?.toJson(),
       'reservations_count': reservationsCount,
     };
+  }
+
+  String get resolvedServiceName {
+    final String explicit = serviceName.trim();
+    if (explicit.isNotEmpty) {
+      return explicit;
+    }
+    return productName.trim().isEmpty ? 'Servicio' : productName;
+  }
+
+  ProductReservationSummary copyWith({
+    String? id,
+    String? serviceId,
+    String? serviceName,
+    String? productName,
+    ServiceCategory? category,
+    String? imageUrl,
+    Booking? nextBooking,
+    int? reservationsCount,
+  }) {
+    return ProductReservationSummary(
+      id: id ?? this.id,
+      serviceId: serviceId ?? this.serviceId,
+      serviceName: serviceName ?? this.serviceName,
+      productName: productName ?? this.productName,
+      category: category ?? this.category,
+      imageUrl: imageUrl ?? this.imageUrl,
+      nextBooking: nextBooking ?? this.nextBooking,
+      reservationsCount: reservationsCount ?? this.reservationsCount,
+    );
   }
 }
 

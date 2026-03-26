@@ -9,28 +9,28 @@ class ProviderBusinessRepository {
   final ApiClient _apiClient;
 
   Future<ProviderBusinessProfile> fetchProfile() async {
-    final Map<String, dynamic> response =
-        await _apiClient.getProviderBusinessProfile();
+    final Map<String, dynamic> response = await _apiClient
+        .getProviderBusinessProfile();
     return ProviderBusinessProfile.fromJson(response);
   }
 
   Future<ProviderBusinessProfile> saveProfile(
     ProviderBusinessProfile profile,
   ) async {
-    final Map<String, dynamic> response =
-        await _apiClient.upsertProviderBusinessProfile(profile.toJson());
+    final Map<String, dynamic> response = await _apiClient
+        .upsertProviderBusinessProfile(profile.toJson());
     return ProviderBusinessProfile.fromJson(response);
   }
 
   Future<ProviderAssetUploadResponse> uploadLogo(String filePath) async {
-    final Map<String, dynamic> response =
-        await _apiClient.uploadProviderBusinessLogo(filePath);
+    final Map<String, dynamic> response = await _apiClient
+        .uploadProviderBusinessLogo(filePath);
     return ProviderAssetUploadResponse.fromJson(response);
   }
 
   Future<ProviderAssetUploadResponse> uploadPhoto(String filePath) async {
-    final Map<String, dynamic> response =
-        await _apiClient.uploadProviderBusinessPhoto(filePath);
+    final Map<String, dynamic> response = await _apiClient
+        .uploadProviderBusinessPhoto(filePath);
     return ProviderAssetUploadResponse.fromJson(response);
   }
 
@@ -44,13 +44,13 @@ class ProviderBusinessRepository {
         }
       }
 
-      return 'No se pudo guardar la informacion del negocio.';
+      return 'No se pudo guardar la información del negocio.';
     }
 
     if (error is FormatException) {
       return error.message;
     }
 
-    return 'Ocurrio un error inesperado.';
+    return 'Ocurrió un error inesperado.';
   }
 }

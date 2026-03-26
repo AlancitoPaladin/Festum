@@ -11,16 +11,16 @@ class ProviderServicesRepository {
   final ApiClient _apiClient;
 
   Future<List<ProviderService>> fetchServices() async {
-    final Map<String, dynamic> response = await _apiClient.getProviderServices();
+    final Map<String, dynamic> response = await _apiClient
+        .getProviderServices();
     return ProviderServicesResponse.fromJson(response).items;
   }
 
   Future<ProviderService> createService(
     ProviderServiceUpsertRequest request,
   ) async {
-    final Map<String, dynamic> response = await _apiClient.createProviderService(
-      request.toJson(),
-    );
+    final Map<String, dynamic> response = await _apiClient
+        .createProviderService(request.toJson());
     return ProviderService.fromJson(response);
   }
 
@@ -28,10 +28,8 @@ class ProviderServicesRepository {
     required String serviceId,
     required ProviderServiceUpsertRequest request,
   }) async {
-    final Map<String, dynamic> response = await _apiClient.updateProviderService(
-      serviceId,
-      request.toJson(),
-    );
+    final Map<String, dynamic> response = await _apiClient
+        .updateProviderService(serviceId, request.toJson());
     return ProviderService.fromJson(response);
   }
 
@@ -50,11 +48,12 @@ class ProviderServicesRepository {
     required String filePath,
     required bool isMain,
   }) async {
-    final Map<String, dynamic> response = await _apiClient.uploadProviderServiceImage(
-      serviceId: serviceId,
-      filePath: filePath,
-      isMain: isMain,
-    );
+    final Map<String, dynamic> response = await _apiClient
+        .uploadProviderServiceImage(
+          serviceId: serviceId,
+          filePath: filePath,
+          isMain: isMain,
+        );
     return ProviderServiceImageUploadResponse.fromJson(response);
   }
 
@@ -100,10 +99,7 @@ class ProviderServicesRepository {
           data,
           fallbackMessage: fallbackMessage,
         );
-        return ProviderRequestError(
-          message: message,
-          fieldErrors: fieldErrors,
-        );
+        return ProviderRequestError(message: message, fieldErrors: fieldErrors);
       }
 
       return ProviderRequestError(message: fallbackMessage);
@@ -113,17 +109,14 @@ class ProviderServicesRepository {
       return ProviderRequestError(message: error.message);
     }
 
-    return ProviderRequestError(message: 'Ocurrio un error inesperado.');
+    return ProviderRequestError(message: 'Ocurrió un error inesperado.');
   }
 
   static String mapApiError(
     Object error, {
     String fallbackMessage = 'No se pudieron cargar los servicios.',
   }) {
-    return mapRequestError(
-      error,
-      fallbackMessage: fallbackMessage,
-    ).message;
+    return mapRequestError(error, fallbackMessage: fallbackMessage).message;
   }
 
   static String _extractMessage(

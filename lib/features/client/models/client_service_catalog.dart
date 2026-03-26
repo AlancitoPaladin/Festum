@@ -92,7 +92,7 @@ class ClientServiceItem {
 
   String get resolvedSubtitle {
     final String candidate = subtitle.trim();
-    return candidate.isEmpty ? 'Sin descripcion breve' : candidate;
+    return candidate.isEmpty ? 'Sin descripción breve' : candidate;
   }
 
   String get resolvedPriceLabel {

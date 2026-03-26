@@ -64,7 +64,9 @@ class MyServicesView extends StatelessWidget {
         const SizedBox(height: 24),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: _AddServiceButton(onTap: () => _openCreateService(context, model)),
+          child: _AddServiceButton(
+            onTap: () => _openCreateService(context, model),
+          ),
         ),
         const SizedBox(height: 24),
         Expanded(
@@ -194,8 +196,8 @@ class MyServicesView extends StatelessWidget {
           title: Text(willPublish ? 'Publicar servicio' : 'Inactivar servicio'),
           content: Text(
             willPublish
-                ? 'Al publicar este servicio, los clientes podran verlo en la app despues de actualizar la informacion.'
-                : 'Al inactivar este servicio, dejara de estar disponible para los clientes hasta que lo vuelvas a publicar.',
+                ? 'Al publicar este servicio, los clientes podrán verlo en la app después de actualizar la información.'
+                : 'Al inactivar este servicio, dejará de estar disponible para los clientes hasta que lo vuelvas a publicar.',
           ),
           actions: <Widget>[
             TextButton(
@@ -215,10 +217,7 @@ class MyServicesView extends StatelessWidget {
 }
 
 class _MyServicesErrorState extends StatelessWidget {
-  const _MyServicesErrorState({
-    required this.message,
-    required this.onRetry,
-  });
+  const _MyServicesErrorState({required this.message, required this.onRetry});
 
   final String message;
   final Future<void> Function() onRetry;
@@ -240,7 +239,10 @@ class _MyServicesErrorState extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.secondaryText, height: 1.4),
+              style: const TextStyle(
+                color: AppColors.secondaryText,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
@@ -278,7 +280,7 @@ class _EmptyMyServicesState extends StatelessWidget {
               ),
               SizedBox(height: 14),
               Text(
-                'Todavia no tienes servicios creados.',
+                'Todavía no tienes servicios creados.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
@@ -287,7 +289,7 @@ class _EmptyMyServicesState extends StatelessWidget {
               ),
               SizedBox(height: 8),
               Text(
-                'Crea uno como draft, revisalo y publicalo cuando ya quieras mostrarlo en Client.',
+                'Crea uno como draft, revísalo y publícalo cuando ya quieras mostrarlo en Client.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.secondaryText, height: 1.4),
               ),
@@ -502,9 +504,7 @@ class _ServiceCard extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: <Widget>[
-                Expanded(
-                  child: _ServiceCardFooterInfo(service: service),
-                ),
+                Expanded(child: _ServiceCardFooterInfo(service: service)),
                 if (isMutating) ...<Widget>[
                   const SizedBox(
                     width: 18,
@@ -654,26 +654,17 @@ class _MiniPill extends StatelessWidget {
 }
 
 class _StatusPresentation {
-  const _StatusPresentation({
-    required this.label,
-    required this.color,
-  });
+  const _StatusPresentation({required this.label, required this.color});
 
   final String label;
   final Color color;
 
   factory _StatusPresentation.from(ProviderService service) {
     if (service.isPublished) {
-      return const _StatusPresentation(
-        label: 'Published',
-        color: Colors.green,
-      );
+      return const _StatusPresentation(label: 'Published', color: Colors.green);
     }
     if (service.isInactive) {
-      return const _StatusPresentation(
-        label: 'Inactive',
-        color: Colors.red,
-      );
+      return const _StatusPresentation(label: 'Inactive', color: Colors.red);
     }
     return const _StatusPresentation(label: 'Draft', color: Colors.orange);
   }

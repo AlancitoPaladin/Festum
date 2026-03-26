@@ -44,10 +44,13 @@ class ProviderNotification {
 
 DateTime _parseDateTime(Object? value) {
   final String rawValue = value?.toString() ?? '';
-  return DateTime.tryParse(rawValue) ?? DateTime.now();
+  return DateTime.tryParse(rawValue) ?? DateTime.fromMillisecondsSinceEpoch(0);
 }
 
 String _buildTimeLabel(DateTime createdAt) {
+  if (createdAt.year < 2000) {
+    return 'Fecha por confirmar';
+  }
   final Duration difference = DateTime.now().difference(createdAt);
 
   if (difference.inMinutes < 1) {

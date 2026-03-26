@@ -109,8 +109,6 @@ class ProviderProfileViewModel extends BaseViewModel {
     }
   }
 
-  void generateReports() {}
-
   Future<void> logout() async {
     await _providerBusinessInfoStateService.resetBusinessInfoProgress();
     await _providerBrandingService.clear();

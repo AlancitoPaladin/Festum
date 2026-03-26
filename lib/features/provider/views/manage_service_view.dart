@@ -128,9 +128,7 @@ class ManageServiceView extends StatelessWidget {
             product: product,
             isDeleting: model.isDeleting(product.id),
             onEdit: () {
-              context.push(
-                AppRoutes.providerEditProductRoute(product.id),
-              );
+              context.push(AppRoutes.providerEditProductRoute(product.id));
             },
             onDelete: () => _deleteProduct(context, model, index),
           );
@@ -233,7 +231,7 @@ class _EmptyManageServiceState extends StatelessWidget {
                 ),
                 SizedBox(height: 14),
                 Text(
-                  'Todavia no tienes productos en este servicio.',
+                  'Todavía no tienes productos en este servicio.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -244,10 +242,7 @@ class _EmptyManageServiceState extends StatelessWidget {
                 Text(
                   'Agrega el primer producto para empezar a manejar precios, disponibilidad y reservas.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.secondaryText,
-                    height: 1.4,
-                  ),
+                  style: TextStyle(color: AppColors.secondaryText, height: 1.4),
                 ),
               ],
             ),

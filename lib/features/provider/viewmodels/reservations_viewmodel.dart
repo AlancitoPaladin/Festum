@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/services/provider_reactivity_service.dart';
 import 'package:festum/features/provider/models/provider_order_request.dart';
+import 'package:festum/features/provider/models/provider_service.dart';
 import 'package:festum/features/provider/models/product_reservations_response.dart';
 import 'package:festum/features/provider/repositories/provider_reservations_repository.dart';
 import 'package:festum/features/provider/usecases/decide_provider_order_request_use_case.dart';
 import 'package:festum/features/provider/usecases/delete_provider_product_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_order_requests_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_product_reservations_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_services_use_case.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:stacked/stacked.dart';
@@ -17,6 +19,7 @@ class ReservationsViewModel extends BaseViewModel {
   ReservationsViewModel(
     this._getProviderOrderRequestsUseCase,
     this._getProviderProductReservationsUseCase,
+    this._getProviderServicesUseCase,
     this._decideProviderOrderRequestUseCase,
     this._deleteProviderProductUseCase,
     this._providerReactivityService,
@@ -28,6 +31,7 @@ class ReservationsViewModel extends BaseViewModel {
   final GetProviderOrderRequestsUseCase _getProviderOrderRequestsUseCase;
   final GetProviderProductReservationsUseCase
   _getProviderProductReservationsUseCase;
+  final GetProviderServicesUseCase _getProviderServicesUseCase;
   final DecideProviderOrderRequestUseCase _decideProviderOrderRequestUseCase;
   final DeleteProviderProductUseCase _deleteProviderProductUseCase;
   final ProviderReactivityService _providerReactivityService;
@@ -56,7 +60,16 @@ class ReservationsViewModel extends BaseViewModel {
         _getProviderProductReservationsUseCase(),
       ]);
       _requests = result[0] as List<ProviderOrderRequest>;
-      _products = result[1] as List<ProductReservationSummary>;
+      final List<ProductReservationSummary> rawProducts =
+          result[1] as List<ProductReservationSummary>;
+      List<ProviderService> services = const <ProviderService>[];
+      try {
+        services = await _getProviderServicesUseCase();
+      } catch (_) {
+        // Best-effort hydration: reservations should still render
+        // even if services lookup is temporarily unavailable.
+      }
+      _products = _hydrateServiceNames(rawProducts, services);
       _lastProductsRevision = _providerReactivityService.productsRevision;
       _hasInitialized = true;
     } catch (error) {
@@ -150,5 +163,26 @@ class ReservationsViewModel extends BaseViewModel {
     }
 
     unawaited(initialise());
+  }
+
+  List<ProductReservationSummary> _hydrateServiceNames(
+    List<ProductReservationSummary> products,
+    List<ProviderService> services,
+  ) {
+    final Map<String, String> serviceNamesById = <String, String>{
+      for (final ProviderService service in services)
+        service.id: service.name.trim(),
+    };
+
+    return products.map((ProductReservationSummary product) {
+      if (product.serviceName.trim().isNotEmpty) {
+        return product;
+      }
+      final String resolved = serviceNamesById[product.serviceId]?.trim() ?? '';
+      if (resolved.isEmpty) {
+        return product;
+      }
+      return product.copyWith(serviceName: resolved);
+    }).toList();
   }
 }

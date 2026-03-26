@@ -11,6 +11,7 @@ class Booking {
   final String customerPhone;
   final String contactEmail;
   final DateTime date;
+  final bool hasExplicitEventDate;
   final String time;
   final String eventType;
   final int guests;
@@ -26,6 +27,8 @@ class Booking {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  bool get hasValidEventDate => hasExplicitEventDate && date.year >= 2000;
+
   Booking({
     this.providerId = '',
     this.serviceId = '',
@@ -39,6 +42,7 @@ class Booking {
     this.customerPhone = '',
     this.contactEmail = '',
     required this.date,
+    this.hasExplicitEventDate = false,
     this.time = '',
     this.eventType = '',
     this.guests = 0,
@@ -61,6 +65,12 @@ class Booking {
     final String startTime = _readString(json, const <String>['start_time']);
     final String endTime = _readString(json, const <String>['end_time']);
     final String timeLabel = _readString(json, const <String>['time_label']);
+    final DateTime? explicitEventDate = _readDateTime(json, const <String>[
+      'event_date',
+      'booking_date',
+      'reservation_date',
+    ]);
+    final DateTime? fallbackDate = _readDateTime(json, const <String>['date']);
     return Booking(
       id: _readString(json, const <String>['id', 'booking_id']),
       bookingId: _readString(json, const <String>['booking_id', 'id']),
@@ -71,15 +81,17 @@ class Booking {
       productName: _readString(json, const <String>['product_name']),
       customerName: _readString(json, const <String>['customer_name']),
       customerImageUrl: _readImageUrl(json),
-      customerPhone: _readString(
-        json,
-        const <String>['contact_phone', 'customer_phone', 'phone'],
-      ),
+      customerPhone: _readString(json, const <String>[
+        'contact_phone',
+        'customer_phone',
+        'phone',
+      ]),
       contactEmail: _readString(json, const <String>['contact_email']),
-      date: DateTime.tryParse(
-            _readString(json, const <String>['event_date', 'date']),
-          ) ??
-          DateTime.now(),
+      date:
+          explicitEventDate ??
+          fallbackDate ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      hasExplicitEventDate: explicitEventDate != null,
       time: timeLabel.isNotEmpty
           ? timeLabel
           : _mergeTimeRange(startTime, endTime),
@@ -113,6 +125,7 @@ class Booking {
       'contact_phone': customerPhone,
       'contact_email': contactEmail,
       'event_date': date.toIso8601String(),
+      'has_explicit_event_date': hasExplicitEventDate,
       'time_label': time,
       'event_type': eventType,
       'guests': guests,

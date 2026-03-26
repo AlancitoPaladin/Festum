@@ -223,7 +223,7 @@ class _HomeTabBody extends StatelessWidget {
           builder: (context, child) => SafeArea(
             child: Container(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(sheetContext).size.height * 0.72,
+                maxHeight: MediaQuery.of(sheetContext).size.height * 0.78,
               ),
               decoration: const BoxDecoration(
                 color: AppColors.background,
@@ -241,47 +241,54 @@ class _HomeTabBody extends StatelessWidget {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 20, 16, 12),
-                    child: Row(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        const Text(
+                          'Notificaciones',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryText,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          model.unreadCount == 0
+                              ? 'Ya revisaste todas tus notificaciones.'
+                              : 'Tienes ${model.unreadCount} notificaciones sin leer.',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.secondaryText,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Wrap(
+                            spacing: 4,
+                            runSpacing: 0,
                             children: [
-                              const Text(
-                                'Notificaciones',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primaryText,
+                              if (model.notifications.isNotEmpty)
+                                TextButton(
+                                  onPressed: () => model.clearAll(),
+                                  child: const Text('Borrar todo'),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                model.unreadCount == 0
-                                    ? 'Ya revisaste todas tus notificaciones.'
-                                    : 'Tienes ${model.unreadCount} notificaciones sin leer.',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.secondaryText,
+                              if (model.unreadCount > 0)
+                                TextButton(
+                                  onPressed: () => model.markAllAsRead(),
+                                  child: const Text('Marcar todo'),
                                 ),
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.of(sheetContext).pop(),
+                                child: const Text('Cerrar'),
                               ),
                             ],
                           ),
-                        ),
-                        if (model.notifications.isNotEmpty)
-                          TextButton(
-                            onPressed: () => model.clearAll(),
-                            child: const Text('Borrar todo'),
-                          ),
-                        if (model.unreadCount > 0)
-                          TextButton(
-                            onPressed: () => model.markAllAsRead(),
-                            child: const Text('Marcar todo'),
-                          ),
-                        TextButton(
-                          onPressed: () => Navigator.of(sheetContext).pop(),
-                          child: const Text('Cerrar'),
                         ),
                       ],
                     ),
@@ -290,7 +297,7 @@ class _HomeTabBody extends StatelessWidget {
                     child: model.notifications.isEmpty
                         ? const _EmptyNotificationsState()
                         : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                             itemCount: model.notifications.length,
                             separatorBuilder: (_, index) =>
                                 const SizedBox(height: 12),
@@ -404,7 +411,7 @@ class _EmptyFeaturedServicesState extends StatelessWidget {
         border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: const Text(
-        'Todavia no tienes servicios destacados para mostrar aqui.',
+        'Todavía no tienes servicios destacados para mostrar aquí.',
         style: TextStyle(color: AppColors.secondaryText, height: 1.35),
       ),
     );

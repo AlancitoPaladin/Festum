@@ -229,7 +229,7 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
     if (_isLoading) {
       return const ClientStatusView.loading(
         title: 'Cargando detalle',
-        message: 'Preparando informacion del servicio...',
+        message: 'Preparando información del servicio...',
       );
     }
 
@@ -299,9 +299,9 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
             ],
             const SizedBox(height: 16),
             _InfoSection(
-              title: 'Descripcion general',
+              title: 'Descripción general',
               body: service.description.trim().isEmpty
-                  ? 'El proveedor aun no agrego una descripcion detallada para este servicio.'
+                  ? 'El proveedor aún no agregó una descripción detallada para este servicio.'
                   : service.description,
             ),
             if (service.products.isEmpty) ...<Widget>[
@@ -309,7 +309,7 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
               const _InfoSection(
                 title: 'Productos',
                 body:
-                    'Este servicio aun no tiene productos publicados. En cuanto el proveedor los publique, apareceran aqui.',
+                    'Este servicio aún no tiene productos publicados. En cuanto el proveedor los publique, aparecerán aquí.',
               ),
             ],
           ],
@@ -711,7 +711,7 @@ class _AvailabilityCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              'Proximamente se mostrara calendario en tiempo real.',
+              'Próximamente se mostrará calendario en tiempo real.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],

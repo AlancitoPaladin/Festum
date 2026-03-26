@@ -9,6 +9,7 @@ import 'package:festum/features/provider/usecases/decide_provider_order_request_
 import 'package:festum/features/provider/usecases/delete_provider_product_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_order_requests_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_product_reservations_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_services_use_case.dart';
 import 'package:festum/features/provider/viewmodels/reservations_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
@@ -22,6 +23,7 @@ class ReservationsView extends StatelessWidget {
       viewModelBuilder: () => ReservationsViewModel(
         locator<GetProviderOrderRequestsUseCase>(),
         locator<GetProviderProductReservationsUseCase>(),
+        locator<GetProviderServicesUseCase>(),
         locator<DecideProviderOrderRequestUseCase>(),
         locator<DeleteProviderProductUseCase>(),
         locator<ProviderReactivityService>(),
@@ -29,7 +31,7 @@ class ReservationsView extends StatelessWidget {
       onViewModelReady: (ReservationsViewModel model) => model.initialise(),
       builder: (context, model, child) => Scaffold(
         backgroundColor: AppColors.background,
-        appBar: const CustomAppBar(title: 'Gestion de reservas'),
+        appBar: const CustomAppBar(title: 'Gestión de reservas'),
         body: _buildBody(context, model),
       ),
     );
@@ -107,28 +109,7 @@ class ReservationsView extends StatelessWidget {
                 ),
                 RefreshIndicator(
                   onRefresh: model.initialise,
-                  child: model.products.isEmpty
-                      ? const _EmptyReservationsState()
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-                          itemCount: model.products.length,
-                          itemBuilder: (context, index) {
-                            final ProductReservationSummary product =
-                                model.products[index];
-                            return _ProductReservationCard(
-                              product: product,
-                              onDelete: () =>
-                                  _deleteProduct(context, model, product.id),
-                              onEdit: () =>
-                                  model.editProduct(context, product.id),
-                              onManage: () => model.manageAvailability(
-                                context,
-                                product.id,
-                                product.productName,
-                              ),
-                            );
-                          },
-                        ),
+                  child: _buildReservationsTab(context, model),
                 ),
               ],
             ),
@@ -136,6 +117,91 @@ class ReservationsView extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildReservationsTab(
+    BuildContext context,
+    ReservationsViewModel model,
+  ) {
+    final List<_UpcomingReservationEntry> upcoming = _buildUpcomingEntries(
+      model.products,
+    );
+
+    if (model.products.isEmpty && upcoming.isEmpty) {
+      return const _EmptyReservationsState();
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+      children: <Widget>[
+        if (upcoming.isNotEmpty) ...<Widget>[
+          const Text(
+            'Próximas reservas',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primaryText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...upcoming.map(
+            (_UpcomingReservationEntry entry) =>
+                _UpcomingReservationCard(entry: entry),
+          ),
+          const SizedBox(height: 18),
+        ],
+        if (model.products.isNotEmpty) ...<Widget>[
+          const Text(
+            'Productos con reservas',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primaryText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...model.products.map((ProductReservationSummary product) {
+            return _ProductReservationCard(
+              product: product,
+              onDelete: () => _deleteProduct(context, model, product.id),
+              onEdit: () => model.editProduct(context, product.id),
+              onManage: () => model.manageAvailability(
+                context,
+                product.id,
+                product.productName,
+              ),
+            );
+          }),
+        ],
+      ],
+    );
+  }
+
+  List<_UpcomingReservationEntry> _buildUpcomingEntries(
+    List<ProductReservationSummary> products,
+  ) {
+    final List<_UpcomingReservationEntry> entries = <_UpcomingReservationEntry>[
+      for (final ProductReservationSummary product in products)
+        if (product.nextBooking != null)
+          _UpcomingReservationEntry(
+            product: product,
+            booking: product.nextBooking!,
+          ),
+    ];
+    entries.sort(
+      (_UpcomingReservationEntry a, _UpcomingReservationEntry b) =>
+          _sortDateForUpcoming(
+            a.booking,
+          ).compareTo(_sortDateForUpcoming(b.booking)),
+    );
+    return entries;
+  }
+
+  DateTime _sortDateForUpcoming(ReservationBookingSummary booking) {
+    if (booking.hasValidEventDate) {
+      return booking.date;
+    }
+    return DateTime(9999, 12, 31);
   }
 
   Future<void> _deleteProduct(
@@ -244,13 +310,88 @@ class _EmptyReservationsState extends StatelessWidget {
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 32),
             child: Text(
-              'Todavia no tienes productos con reservaciones para gestionar.',
+              'Todavía no tienes productos con reservaciones para gestionar.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.secondaryText, height: 1.4),
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _UpcomingReservationEntry {
+  const _UpcomingReservationEntry({
+    required this.product,
+    required this.booking,
+  });
+
+  final ProductReservationSummary product;
+  final ReservationBookingSummary booking;
+}
+
+class _UpcomingReservationCard extends StatelessWidget {
+  const _UpcomingReservationCard({required this.entry});
+
+  final _UpcomingReservationEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final String dateLabel = _formatBookingDate(entry.booking);
+    final String customerName = entry.booking.customerName.trim().isEmpty
+        ? 'Cliente'
+        : entry.booking.customerName.trim();
+    final String serviceName = entry.booking.serviceName.trim().isEmpty
+        ? entry.product.resolvedServiceName
+        : entry.booking.serviceName.trim();
+    final String timeLabel = entry.booking.time.trim();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.cardAccent,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(
+                Icons.event_available_rounded,
+                size: 18,
+                color: AppColors.activeIcon,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  serviceName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primaryText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Cliente: $customerName',
+            style: const TextStyle(color: AppColors.secondaryText),
+          ),
+          Text(
+            timeLabel.isEmpty
+                ? 'Fecha: $dateLabel'
+                : 'Fecha: $dateLabel • $timeLabel',
+            style: const TextStyle(color: AppColors.secondaryText),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -415,12 +556,20 @@ class _ProductReservationCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        product.productName,
+                        product.resolvedServiceName,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),
                       ),
+                      if (product.productName.trim().isNotEmpty)
+                        Text(
+                          'Producto: ${product.productName}',
+                          style: const TextStyle(
+                            color: AppColors.secondaryText,
+                            fontSize: 13,
+                          ),
+                        ),
                       Text(
                         product.category.label,
                         style: const TextStyle(
@@ -527,8 +676,9 @@ class _NextBookingInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String dateStr =
-        '${booking.date.day}/${booking.date.month}/${booking.date.year}';
+    final String dateStr = booking.hasValidEventDate
+        ? '${booking.date.day}/${booking.date.month}/${booking.date.year}'
+        : 'Por confirmar';
     final String resolvedImageUrl = resolveApiAssetUrl(
       booking.customerImageUrl,
     );
@@ -598,4 +748,15 @@ class _NextBookingInfo extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatBookingDate(ReservationBookingSummary booking) {
+  if (!booking.hasValidEventDate) {
+    return 'Por confirmar';
+  }
+  final DateTime date = booking.date;
+  final String day = date.day.toString().padLeft(2, '0');
+  final String month = date.month.toString().padLeft(2, '0');
+  final String year = date.year.toString();
+  return '$day/$month/$year';
 }

@@ -79,10 +79,10 @@ class AddProductView extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
-              _buildSectionTitle('Descripcion detallada'),
+              _buildSectionTitle('Descripción detallada'),
               _buildTextField(
                 '',
-                'Describe lo que ofreces especificamente...',
+                'Describe lo que ofreces específicamente...',
                 maxLines: 3,
                 onChanged: model.updateDescription,
                 inputKind: ProviderFieldInputKind.mixedText,
@@ -126,7 +126,9 @@ class AddProductView extends StatelessWidget {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Producto creado en borrador. Ahora puedes agregar fotos.'),
+        content: Text(
+          'Producto creado en borrador. Ahora puedes agregar fotos.',
+        ),
       ),
     );
     context.pushReplacement(AppRoutes.providerEditProductRoute(product.id));
@@ -170,12 +172,11 @@ class AddProductView extends StatelessWidget {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildDropdown(
-                  'Tipo de precio',
-                  data.pricingUnit,
-                  ['Por evento', 'Por hora', 'Por persona'],
-                  model.updatePricingUnit,
-                ),
+                child: _buildDropdown('Tipo de precio', data.pricingUnit, [
+                  'Por evento',
+                  'Por hora',
+                  'Por persona',
+                ], model.updatePricingUnit),
               ),
             ],
           ),
@@ -568,10 +569,7 @@ class AddProductView extends StatelessWidget {
             inputFormatters: <TextInputFormatter>[
               ...ProviderFieldInput.formatters(inputKind),
             ],
-            style: const TextStyle(
-              color: AppColors.primaryText,
-              fontSize: 14,
-            ),
+            style: const TextStyle(color: AppColors.primaryText, fontSize: 14),
             decoration: InputDecoration(
               border: InputBorder.none,
               hintText: hint,
@@ -579,11 +577,7 @@ class AddProductView extends StatelessWidget {
               hintStyle: const TextStyle(color: Colors.black26, fontSize: 14),
               prefixText: prefix,
               suffixIcon: suffixIcon != null
-                  ? Icon(
-                      suffixIcon,
-                      size: 18,
-                      color: AppColors.secondaryText,
-                    )
+                  ? Icon(suffixIcon, size: 18, color: AppColors.secondaryText)
                   : null,
             ),
           ),
@@ -625,10 +619,7 @@ class AddProductView extends StatelessWidget {
                   .map(
                     (item) => DropdownMenuItem<String>(
                       value: item,
-                      child: Text(
-                        item,
-                        style: const TextStyle(fontSize: 13),
-                      ),
+                      child: Text(item, style: const TextStyle(fontSize: 13)),
                     ),
                   )
                   .toList(),

@@ -39,6 +39,7 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
     _getClientOrdersUseCase = locator<GetClientOrdersUseCase>();
     _updateClientOrderStatusUseCase = locator<UpdateClientOrderStatusUseCase>();
     _tabUiStateService = locator<ClientTabUiStateService>();
+    _tabUiStateService.clearOrderNotifications();
     _scrollController = ScrollController(
       initialScrollOffset: _tabUiStateService.scrollOffsetFor(ClientTab.orders),
     )..addListener(_onScroll);
@@ -104,6 +105,8 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
         });
       }
       _tabUiStateService.setOrdersCount(result.length);
+      _tabUiStateService.ingestOrders(result);
+      _tabUiStateService.clearOrderNotifications();
       if (!showLoader) {
         ClientFeedback.showMessage(context, message: 'Órdenes actualizadas');
       }

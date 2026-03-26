@@ -337,46 +337,62 @@ class _ClientCartViewState extends State<ClientCartView> {
     }
 
     setState(() => _isCheckingOut = true);
-    final createdOrder = await _checkoutCartUseCase(
-      eventDate: eventDate,
-      notes: notes,
-    );
-    if (!mounted) {
-      return;
-    }
-    setState(() => _isCheckingOut = false);
+    try {
+      final createdOrder = await _checkoutCartUseCase(
+        eventDate: eventDate,
+        notes: notes,
+      );
 
-    if (createdOrder == null) {
+      if (!mounted) {
+        return;
+      }
+
+      if (createdOrder == null) {
+        ClientFeedback.showMessage(
+          context,
+          message:
+              'El carrito está vacío. Agrega servicios antes de continuar.',
+        );
+        HapticFeedback.selectionClick();
+        return;
+      }
+
+      await _loadCart(showLoader: false);
+      if (!mounted) {
+        return;
+      }
+      _tabUiStateService.setOrdersCount(
+        _tabUiStateService.badgeFor(ClientTab.orders) + 1,
+      );
       ClientFeedback.showMessage(
         context,
-        message: 'El carrito esta vacio. Agrega servicios antes de continuar.',
+        message: 'Orden #${createdOrder.id} creada correctamente.',
+      );
+      HapticFeedback.mediumImpact();
+      if (!mounted) {
+        return;
+      }
+      context.go(
+        AppRoutes.clientCheckoutSuccessRoute(
+          orderId: createdOrder.id,
+          title: createdOrder.title,
+          totalLabel: createdOrder.totalLabel,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ClientFeedback.showMessage(
+        context,
+        message: 'No se pudo completar la orden. Intenta nuevamente.',
       );
       HapticFeedback.selectionClick();
-      return;
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingOut = false);
+      }
     }
-
-    await _loadCart(showLoader: false);
-    if (!mounted) {
-      return;
-    }
-    _tabUiStateService.setOrdersCount(
-      _tabUiStateService.badgeFor(ClientTab.orders) + 1,
-    );
-    ClientFeedback.showMessage(
-      context,
-      message: 'Orden #${createdOrder.id} creada correctamente.',
-    );
-    HapticFeedback.mediumImpact();
-    if (!mounted) {
-      return;
-    }
-    context.go(
-      AppRoutes.clientCheckoutSuccessRoute(
-        orderId: createdOrder.id,
-        title: createdOrder.title,
-        totalLabel: createdOrder.totalLabel,
-      ),
-    );
   }
 
   String _formatDate(DateTime date) {

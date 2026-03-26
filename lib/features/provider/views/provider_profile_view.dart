@@ -197,27 +197,6 @@ class ProviderProfileView extends StatelessWidget {
           ),
           const Divider(height: 1, indent: 56, endIndent: 16),
           _buildMenuItem(
-            icon: Icons.bar_chart_outlined,
-            title: 'Generar reportes',
-            onTap: model.generateReports,
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'Próximamente',
-                style: TextStyle(
-                  color: Colors.orange,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const Divider(height: 1, indent: 56, endIndent: 16),
-          _buildMenuItem(
             icon: Icons.logout,
             title: 'Cerrar sesión',
             textColor: Colors.red,
@@ -266,10 +245,7 @@ class ProviderProfileView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            model.errorMessage!,
-            style: const TextStyle(color: Colors.red),
-          ),
+          Text(model.errorMessage!, style: const TextStyle(color: Colors.red)),
           const SizedBox(height: 12),
           TextButton(
             onPressed: model.initialise,
@@ -289,9 +265,7 @@ class ProviderProfileView extends StatelessWidget {
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Cerrar sesión'),
-          content: const Text(
-            '¿Deseas salir de tu sesión en este momento?',
-          ),
+          content: const Text('¿Deseas salir de tu sesión en este momento?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),

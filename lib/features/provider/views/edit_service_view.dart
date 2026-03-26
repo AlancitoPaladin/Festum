@@ -107,7 +107,7 @@ class EditServiceView extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Actualiza la informacion esencial de tu servicio.',
+                    'Actualiza la información esencial de tu servicio.',
                     style: TextStyle(
                       color: AppColors.secondaryText,
                       fontSize: 14,
@@ -139,7 +139,7 @@ class EditServiceView extends StatelessWidget {
                     child: _buildTextField(
                       controller: model.nameController,
                       label: 'Nombre del servicio',
-                      hint: 'Ej. Salon para eventos',
+                      hint: 'Ej. Salón para eventos',
                       onChanged: model.updateName,
                       inputKind: ProviderFieldInputKind.title,
                       errorText: model.fieldError('name'),
@@ -150,7 +150,7 @@ class EditServiceView extends StatelessWidget {
                     key: _subtitleFieldKey,
                     child: _buildTextField(
                       controller: model.subtitleController,
-                      label: 'Subtitulo',
+                      label: 'Subtítulo',
                       hint: 'Ej. Hasta 250 invitados',
                       onChanged: model.updateSubtitle,
                       inputKind: ProviderFieldInputKind.mixedText,
@@ -167,8 +167,8 @@ class EditServiceView extends StatelessWidget {
                     key: _descriptionFieldKey,
                     child: _buildTextField(
                       controller: model.descriptionController,
-                      label: 'Descripcion del servicio',
-                      hint: 'Describe tu servicio, que ofreces?',
+                      label: 'Descripción del servicio',
+                      hint: 'Describe tu servicio, ¿qué ofreces?',
                       maxLines: 4,
                       onChanged: model.updateDescription,
                       inputKind: ProviderFieldInputKind.mixedText,
@@ -946,7 +946,7 @@ class _PhotoEmptyCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      'Todavia no agregas fotos',
+                      'Todavía no agregas fotos',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: AppColors.primaryText,

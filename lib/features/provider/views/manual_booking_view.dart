@@ -160,10 +160,10 @@ class ManualBookingView extends StatelessWidget {
               _buildSectionCard(
                 title: 'Detalles opcionales',
                 subtitle:
-                    'Sirven como recordatorio rapido para que no se te escape informacion importante.',
+                    'Sirven como recordatorio rápido para que no se te escape información importante.',
                 children: [
                   _buildField(
-                    label: 'Telefono / WhatsApp',
+                    label: 'Teléfono / WhatsApp',
                     hint: 'Ej: 55 1234 5678',
                     controller: model.contactPhoneController,
                     inputKind: ProviderFieldInputKind.phone,

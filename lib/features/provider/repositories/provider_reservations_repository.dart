@@ -59,6 +59,6 @@ class ProviderReservationsRepository {
       return error.message;
     }
 
-    return 'Ocurrio un error inesperado.';
+    return 'Ocurrió un error inesperado.';
   }
 }
