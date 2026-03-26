@@ -70,17 +70,13 @@ class ManualBookingView extends StatelessWidget {
                         : _formatDate(model.selectedDate!),
                     Icons.calendar_today_outlined,
                     () async {
-                      final now = DateTime.now();
-                      final DateTime firstDate =
-                          model.selectedDate != null &&
-                              model.selectedDate!.isBefore(now)
-                          ? model.selectedDate!
-                          : now;
                       final date = await showDatePicker(
                         context: context,
-                        initialDate: model.selectedDate ?? now,
-                        firstDate: firstDate,
-                        lastDate: now.add(const Duration(days: 365)),
+                        initialDate: model.pickerInitialDate,
+                        firstDate: model.minimumSelectableDate,
+                        lastDate: model.minimumSelectableDate.add(
+                          const Duration(days: 365),
+                        ),
                       );
                       if (date != null) {
                         model.setDate(date);

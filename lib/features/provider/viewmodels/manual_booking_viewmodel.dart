@@ -20,7 +20,10 @@ class ManualBookingViewModel extends BaseViewModel {
        _updateProviderBookingUseCase = updateProviderBookingUseCase,
        _providerReactivityService = providerReactivityService,
        _initialBooking = initialBooking,
-       selectedDate = initialBooking?.date ?? initialDate {
+       selectedDate = _resolveInitialSelectedDate(
+         initialBooking: initialBooking,
+         initialDate: initialDate,
+       ) {
     customerNameController.text = initialBooking?.customerName ?? '';
     eventTypeController.text = initialBooking?.eventType ?? '';
     guestsController.text = initialBooking == null || initialBooking.guests == 0
@@ -79,8 +82,18 @@ class ManualBookingViewModel extends BaseViewModel {
     return pending < 0 ? 0 : pending;
   }
 
+  DateTime get minimumSelectableDate => _today();
+
+  DateTime get pickerInitialDate {
+    final DateTime? current = selectedDate;
+    if (current == null || _isPastDate(current)) {
+      return minimumSelectableDate;
+    }
+    return _dateOnly(current);
+  }
+
   void setDate(DateTime date) {
-    selectedDate = date;
+    selectedDate = _dateOnly(date);
     _clearError();
     notifyListeners();
   }
@@ -182,6 +195,9 @@ class ManualBookingViewModel extends BaseViewModel {
     if (selectedDate == null) {
       return 'Selecciona una fecha.';
     }
+    if (_isPastDate(selectedDate!)) {
+      return 'Selecciona una fecha de hoy en adelante.';
+    }
     if (eventTypeController.text.trim().isEmpty) {
       return 'Ingresa el tipo de evento.';
     }
@@ -228,6 +244,10 @@ class ManualBookingViewModel extends BaseViewModel {
     notifyListeners();
   }
 
+  bool _isPastDate(DateTime value) {
+    return _dateOnly(value).isBefore(_today());
+  }
+
   @override
   void dispose() {
     customerNameController.dispose();
@@ -243,6 +263,34 @@ class ManualBookingViewModel extends BaseViewModel {
     paidAmountController.dispose();
     super.dispose();
   }
+}
+
+DateTime _resolveInitialSelectedDate({
+  required Booking? initialBooking,
+  required DateTime? initialDate,
+}) {
+  if (initialBooking != null) {
+    return _dateOnly(initialBooking.date);
+  }
+
+  if (initialDate == null) {
+    return _today();
+  }
+
+  final DateTime normalized = _dateOnly(initialDate);
+  if (normalized.isBefore(_today())) {
+    return _today();
+  }
+  return normalized;
+}
+
+DateTime _today() {
+  final DateTime now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+}
+
+DateTime _dateOnly(DateTime value) {
+  return DateTime(value.year, value.month, value.day);
 }
 
 String _initialTextAmount(double? value) {
