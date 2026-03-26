@@ -58,7 +58,9 @@ class LoginView extends StackedView<LoginViewModel> {
             SizedBox(
               height: 54,
               child: ElevatedButton(
-                onPressed: viewModel.isBusy ? null : () => _submit(context, viewModel),
+                onPressed: viewModel.isBusy
+                    ? null
+                    : () => _submit(context, viewModel),
                 style: ElevatedButton.styleFrom(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -72,6 +74,13 @@ class LoginView extends StackedView<LoginViewModel> {
                       )
                     : const Text('Entrar'),
               ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: viewModel.isBusy
+                  ? null
+                  : () => context.go(AppRoutes.registrationType),
+              child: const Text('Crear cuenta con afiliación'),
             ),
           ],
         ),
@@ -97,20 +106,17 @@ class LoginView extends StackedView<LoginViewModel> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppColors.alert,
-        content: Text(error),
-      ),
+      SnackBar(backgroundColor: AppColors.alert, content: Text(error)),
     );
   }
 
   @override
   LoginViewModel viewModelBuilder(BuildContext context) => LoginViewModel(
-      locator(),
-      locator(),
-      locator(),
-      locator(),
-      locator(),
-      locator(),
-    );
+    locator(),
+    locator(),
+    locator(),
+    locator(),
+    locator(),
+    locator(),
+  );
 }

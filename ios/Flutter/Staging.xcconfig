@@ -1,4 +1,4 @@
-#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.staging.xcconfig"
 #include "Generated.xcconfig"
 
 // APP_ENV=staging, USE_CLIENT_MOCKS=false

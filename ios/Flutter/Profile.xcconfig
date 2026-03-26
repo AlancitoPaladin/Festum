@@ -1,0 +1,5 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"
+#include "Generated.xcconfig"
+
+// APP_ENV=prod, USE_CLIENT_MOCKS=false
+DART_DEFINES=$(inherited),QVBQX0VOVj1wcm9k,VVNFX0NMSUVOVF9NT0NLUz1mYWxzZQ==
