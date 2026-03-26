@@ -7,7 +7,7 @@ class AppEnvironment {
     'API_BASE_URL',
   );
 
-  static const String _productionApiBaseUrl = 'https://api.example.com';
+  static const String _productionApiBaseUrl = 'http://18.219.37.43';
   static const bool _useClientMocksFromDefine = bool.fromEnvironment(
     'USE_CLIENT_MOCKS',
     defaultValue: false,

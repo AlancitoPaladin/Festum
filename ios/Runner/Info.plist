@@ -32,6 +32,11 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Permite conexion local para depuracion de Flutter en desarrollo.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
