@@ -1,12 +1,16 @@
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
+import 'package:festum/core/network/api_error_mapper.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/app_remote_image.dart';
+import 'package:festum/features/client/models/client_cart_item.dart';
+import 'package:festum/features/client/models/client_order_item.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
 import 'package:festum/features/client/models/client_tab.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
 import 'package:festum/features/client/usecases/add_service_to_cart_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_cart_items_use_case.dart';
+import 'package:festum/features/client/usecases/get_client_orders_use_case.dart';
 import 'package:festum/features/client/usecases/get_services_by_category_use_case.dart';
 import 'package:festum/features/client/widgets/client_feedback.dart';
 import 'package:festum/features/client/widgets/client_shell_scaffold.dart';
@@ -30,6 +34,7 @@ class _ClientServicesByCategoryViewState
     extends State<ClientServicesByCategoryView> {
   late final GetServicesByCategoryUseCase _getServicesByCategoryUseCase;
   late final GetClientCartItemsUseCase _getClientCartItemsUseCase;
+  late final GetClientOrdersUseCase _getClientOrdersUseCase;
   late final AddServiceToCartUseCase _addServiceToCartUseCase;
   late final ClientTabUiStateService _tabUiStateService;
 
@@ -37,6 +42,7 @@ class _ClientServicesByCategoryViewState
   String? _errorMessage;
   List<ClientServiceItem> _services = <ClientServiceItem>[];
   Set<String> _cartServiceIds = <String>{};
+  Set<String> _activeOrderServiceIds = <String>{};
   Set<String> _addingServiceIds = <String>{};
   Set<String> _recentlyAddedServiceIds = <String>{};
   Set<String> _addErrorServiceIds = <String>{};
@@ -47,6 +53,7 @@ class _ClientServicesByCategoryViewState
     super.initState();
     _getServicesByCategoryUseCase = locator<GetServicesByCategoryUseCase>();
     _getClientCartItemsUseCase = locator<GetClientCartItemsUseCase>();
+    _getClientOrdersUseCase = locator<GetClientOrdersUseCase>();
     _addServiceToCartUseCase = locator<AddServiceToCartUseCase>();
     _tabUiStateService = locator<ClientTabUiStateService>();
     _loadServices(showLoader: true);
@@ -72,13 +79,16 @@ class _ClientServicesByCategoryViewState
       if (!showLoader) {
         ClientFeedback.showMessage(context, message: 'Servicios actualizados');
       }
-      await _syncCartState();
-    } catch (_) {
+      await _syncClientLocks();
+    } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _errorMessage = 'No pudimos cargar esta categoría.';
+        _errorMessage = ApiErrorMapper.toUserMessage(
+          error,
+          fallback: 'No pudimos cargar esta categoría.',
+        );
         _isLoading = false;
       });
     }
@@ -92,13 +102,25 @@ class _ClientServicesByCategoryViewState
     await _loadServices(showLoader: false);
   }
 
-  Future<void> _syncCartState() async {
-    final cartItems = await _getClientCartItemsUseCase();
+  Future<void> _syncClientLocks() async {
+    final List<ClientCartItem> cartItems = await _getClientCartItemsUseCase();
+    final List<ClientOrderItem> orders = await _getClientOrdersUseCase();
+    final Set<String> activeOrderServiceIds = orders
+        .where(
+          (ClientOrderItem order) =>
+              order.status != ClientOrderStatus.cancelled &&
+              order.status != ClientOrderStatus.completed,
+        )
+        .expand((ClientOrderItem order) => order.items)
+        .map((item) => item.serviceId.trim())
+        .where((String serviceId) => serviceId.isNotEmpty)
+        .toSet();
     if (!mounted) {
       return;
     }
     setState(() {
-      _cartServiceIds = cartItems.map((item) => item.id).toSet();
+      _cartServiceIds = cartItems.map((ClientCartItem item) => item.id).toSet();
+      _activeOrderServiceIds = activeOrderServiceIds;
     });
     _tabUiStateService.setCartCount(cartItems.length);
   }
@@ -123,6 +145,15 @@ class _ClientServicesByCategoryViewState
       HapticFeedback.selectionClick();
       return;
     }
+    if (_activeOrderServiceIds.contains(item.id)) {
+      ClientFeedback.showMessage(
+        context,
+        message:
+            'Este servicio ya tiene una orden activa. Podrás solicitarlo de nuevo cuando se complete o se cancele.',
+      );
+      HapticFeedback.selectionClick();
+      return;
+    }
 
     setState(() {
       _addingServiceIds = <String>{..._addingServiceIds, item.id};
@@ -130,11 +161,32 @@ class _ClientServicesByCategoryViewState
       _recentlyAddedServiceIds = <String>{..._recentlyAddedServiceIds}
         ..remove(item.id);
     });
-    final bool added = await _addServiceToCartUseCase(
-      serviceId: item.id,
-      name: item.name,
-      unitPriceCents: item.unitPriceCents,
-    );
+    bool added = false;
+    try {
+      added = await _addServiceToCartUseCase(
+        serviceId: item.id,
+        name: item.name,
+        unitPriceCents: item.unitPriceCents,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _addingServiceIds = <String>{..._addingServiceIds}..remove(item.id);
+        _addErrorServiceIds = <String>{..._addErrorServiceIds, item.id};
+      });
+      ClientFeedback.showMessage(
+        context,
+        message: ApiErrorMapper.toUserMessage(
+          error,
+          fallback: 'No se pudo agregar el servicio al carrito.',
+        ),
+      );
+      HapticFeedback.selectionClick();
+      _clearTransientAddState(item.id);
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -151,7 +203,7 @@ class _ClientServicesByCategoryViewState
         message: 'Este servicio ya está en el carrito.',
       );
       HapticFeedback.selectionClick();
-      await _syncCartState();
+      await _syncClientLocks();
       return;
     }
 
@@ -227,6 +279,7 @@ class _ClientServicesByCategoryViewState
 
     return ListView.separated(
       physics: const BouncingScrollPhysics(),
+      cacheExtent: 800,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       itemCount: _services.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -289,10 +342,14 @@ class _ClientServicesByCategoryViewState
                           ? 'Error al agregar'
                           : _recentlyAddedServiceIds.contains(item.id)
                           ? 'Agregado'
+                          : _activeOrderServiceIds.contains(item.id)
+                          ? 'Orden activa en curso'
                           : _cartServiceIds.contains(item.id)
                           ? 'Ver carrito'
                           : 'Agregar',
                       onPressed: _addingServiceIds.contains(item.id)
+                          ? null
+                          : _activeOrderServiceIds.contains(item.id)
                           ? null
                           : _cartServiceIds.contains(item.id)
                           ? _goToCart
@@ -331,6 +388,8 @@ class _ClientServicesByCategoryViewState
                                     ? Icons.error_outline_rounded
                                     : _recentlyAddedServiceIds.contains(item.id)
                                     ? Icons.check_circle_rounded
+                                    : _activeOrderServiceIds.contains(item.id)
+                                    ? Icons.lock_clock_rounded
                                     : _cartServiceIds.contains(item.id)
                                     ? Icons.shopping_cart_checkout_rounded
                                     : Icons.add_shopping_cart_rounded,

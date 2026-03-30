@@ -1,6 +1,6 @@
-import 'package:dio/dio.dart';
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
+import 'package:festum/core/network/api_error_mapper.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/features/client/models/client_order_item.dart';
 import 'package:festum/features/client/models/client_tab.dart';
@@ -32,6 +32,7 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
   String? _errorMessage;
   List<ClientOrderItem> _orders = <ClientOrderItem>[];
   Set<String> _highlightedOrderIds = <String>{};
+  bool _showCancelledOrders = false;
 
   @override
   void initState() {
@@ -39,7 +40,6 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
     _getClientOrdersUseCase = locator<GetClientOrdersUseCase>();
     _updateClientOrderStatusUseCase = locator<UpdateClientOrderStatusUseCase>();
     _tabUiStateService = locator<ClientTabUiStateService>();
-    _tabUiStateService.clearOrderNotifications();
     _scrollController = ScrollController(
       initialScrollOffset: _tabUiStateService.scrollOffsetFor(ClientTab.orders),
     )..addListener(_onScroll);
@@ -106,16 +106,18 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
       }
       _tabUiStateService.setOrdersCount(result.length);
       _tabUiStateService.ingestOrders(result);
-      _tabUiStateService.clearOrderNotifications();
       if (!showLoader) {
         ClientFeedback.showMessage(context, message: 'Órdenes actualizadas');
       }
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _errorMessage = 'No pudimos cargar tus órdenes.';
+        _errorMessage = ApiErrorMapper.toUserMessage(
+          error,
+          fallback: 'No pudimos cargar tus órdenes.',
+        );
         _isLoading = false;
       });
     }
@@ -132,6 +134,8 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
   }
 
   Widget _buildBody() {
+    final List<ClientOrderItem> visibleOrders = _visibleOrders;
+
     if (_isLoading) {
       return const ClientStatusView.loading(
         title: 'Cargando órdenes',
@@ -157,57 +161,136 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
       );
     }
 
-    return ListView.separated(
-      controller: _scrollController,
-      physics: const AlwaysScrollableScrollPhysics(
-        parent: BouncingScrollPhysics(),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-      itemCount: _orders.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (BuildContext context, int index) {
-        final ClientOrderItem order = _orders[index];
-        return StaggeredAppear(
-          index: index,
-          child: AnimatedScale(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutBack,
-            scale: _highlightedOrderIds.contains(order.id) ? 1.015 : 1,
-            child: Card(
-              child: ListTile(
-                leading: const Icon(Icons.receipt_long_rounded),
-                title: Text(
-                  'Orden #${order.id} - ${order.title}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      OrderStatusChip(status: order.status),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Total: ${_resolvedPayableLabel(order)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+    return Column(
+      children: <Widget>[
+        if (_hiddenHistoryOrdersCount > 0)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    _showCancelledOrders
+                        ? 'Mostrando historial (incluye canceladas y completadas)'
+                        : 'Ocultando $_hiddenHistoryOrdersCount orden(es) del historial',
+                    style: Theme.of(context).textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                trailing: const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.secondaryText,
+                const SizedBox(width: 10),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _showCancelledOrders = !_showCancelledOrders;
+                    });
+                  },
+                  child: Text(
+                    _showCancelledOrders
+                        ? 'Ocultar finalizadas'
+                        : 'Ver finalizadas',
+                  ),
                 ),
-                onTap: () => _openOrderDetail(order),
-              ),
+              ],
             ),
           ),
-        );
-      },
+        Expanded(
+              child: visibleOrders.isEmpty
+                  ? ClientStatusView.empty(
+                      title: 'No tienes órdenes activas',
+                      message:
+                          'Tus órdenes del historial (canceladas/completadas) están ocultas para mantener limpia esta sección.',
+                      onPrimaryAction: _hiddenHistoryOrdersCount > 0
+                          ? () {
+                              setState(() => _showCancelledOrders = true);
+                            }
+                          : () => context.go(AppRoutes.clientServices),
+                      primaryActionLabel: _hiddenHistoryOrdersCount > 0
+                          ? 'Ver finalizadas'
+                          : 'Explorar servicios',
+                      onRetry: () => _loadOrders(showLoader: true),
+                      retryLabel: 'Actualizar',
+                )
+              : ListView.separated(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
+                  cacheExtent: 700,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                  itemCount: visibleOrders.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (BuildContext context, int index) {
+                    final ClientOrderItem order = visibleOrders[index];
+                    return StaggeredAppear(
+                      index: index,
+                      child: AnimatedScale(
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeOutBack,
+                        scale: _highlightedOrderIds.contains(order.id)
+                            ? 1.015
+                            : 1,
+                        child: Card(
+                          child: ListTile(
+                            leading: const Icon(Icons.receipt_long_rounded),
+                            title: Text(
+                              'Orden #${order.id} - ${order.title}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  OrderStatusChip(status: order.status),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Total: ${_resolvedPayableLabel(order)}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.chevron_right_rounded,
+                              color: AppColors.secondaryText,
+                            ),
+                            onTap: () => _openOrderDetail(order),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
+  }
+
+  List<ClientOrderItem> get _visibleOrders {
+    if (_showCancelledOrders) {
+      return _orders;
+    }
+    return _orders
+        .where(
+          (ClientOrderItem item) =>
+              item.status != ClientOrderStatus.cancelled &&
+              item.status != ClientOrderStatus.completed,
+        )
+        .toList();
+  }
+
+  int get _hiddenHistoryOrdersCount {
+    return _orders
+        .where(
+          (ClientOrderItem item) =>
+              item.status == ClientOrderStatus.cancelled ||
+              item.status == ClientOrderStatus.completed,
+        )
+        .length;
   }
 
   Future<void> _openOrderDetail(ClientOrderItem order) async {
@@ -400,40 +483,28 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
         return;
       }
       ClientFeedback.showMessage(context, message: successMessage);
-    } on DioException catch (error) {
-      if (!mounted) {
-        return;
-      }
-      final int? statusCode = error.response?.statusCode;
-      if (statusCode == 409) {
-        ClientFeedback.showMessage(
-          context,
-          message:
-              'La orden cambió de estado y ya no se puede aplicar esta acción.',
-        );
-        await _loadOrders(showLoader: false);
-        return;
-      }
-      if (statusCode == 500) {
-        ClientFeedback.showMessage(
-          context,
-          message:
-              'No se pudo actualizar la orden por un error del servidor. Intenta nuevamente.',
-        );
-        return;
-      }
-      ClientFeedback.showMessage(
-        context,
-        message: 'No se pudo actualizar la orden. Verifica tu conexión.',
-      );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
       ClientFeedback.showMessage(
         context,
-        message: 'Ocurrió un error inesperado al actualizar la orden.',
+        message: ApiErrorMapper.toUserMessage(
+          error,
+          fallback: 'No se pudo actualizar la orden. Verifica tu conexión.',
+          codeOverrides: const <String, String>{
+            'ORDER_INVALID_TRANSITION':
+                'La orden cambió de estado y ya no se puede aplicar esta acción.',
+          },
+          statusOverrides: const <int, String>{
+            409:
+                'La orden cambió de estado y ya no se puede aplicar esta acción.',
+            500:
+                'No se pudo actualizar la orden por un error del servidor. Intenta nuevamente.',
+          },
+        ),
       );
+      await _loadOrders(showLoader: false);
     }
   }
 

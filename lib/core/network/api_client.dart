@@ -8,6 +8,7 @@ class ApiClient {
   static const String _authBasePath = '/api/v1/auth';
   static const String _clientBasePath = '/api/v1/client';
   static const String _providersBasePath = '/api/v1/providers';
+  static const String _notificationsBasePath = '/api/v1/notifications';
 
   Future<Response<dynamic>> healthCheck() {
     return _dio.get<dynamic>('/health');
@@ -51,6 +52,27 @@ class ApiClient {
   Future<Map<String, dynamic>> me() async {
     final Response<dynamic> response = await _dio.get<dynamic>(
       '$_authBasePath/me',
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> registerDeviceToken({
+    required String token,
+    required String platform,
+  }) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '$_notificationsBasePath/device-token',
+      data: <String, dynamic>{'token': token, 'platform': platform},
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> unregisterDeviceToken({
+    required String token,
+  }) async {
+    final Response<dynamic> response = await _dio.delete<dynamic>(
+      '$_notificationsBasePath/device-token',
+      data: <String, dynamic>{'token': token},
     );
     return _toMap(response.data);
   }

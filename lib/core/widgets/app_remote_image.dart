@@ -52,46 +52,72 @@ class _AppRemoteImageState extends State<AppRemoteImage> {
     }
 
     return _wrap(
-      isLocalFile
-          ? Image.file(
+      LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final _CacheTarget cacheTarget = _resolveCacheTarget(
+            context: context,
+            constraints: constraints,
+          );
+
+          if (isLocalFile) {
+            return Image.file(
               _toLocalFile(resolvedImageUrl),
               width: widget.width,
               height: widget.height,
               fit: widget.fit,
-              errorBuilder:
-                  (BuildContext context, Object error, StackTrace? stackTrace) {
-                    return widget.placeholder;
-                  },
-            )
-          : Image.network(
-              resolvedImageUrl,
-              width: widget.width,
-              height: widget.height,
-              fit: widget.fit,
-              headers: widget.headers,
-              loadingBuilder:
+              cacheWidth: cacheTarget.width,
+              cacheHeight: cacheTarget.height,
+              filterQuality: FilterQuality.low,
+              gaplessPlayback: true,
+              frameBuilder:
                   (
                     BuildContext context,
                     Widget child,
-                    ImageChunkEvent? loadingProgress,
+                    int? frame,
+                    bool wasSynchronouslyLoaded,
                   ) {
-                    if (loadingProgress == null) {
+                    if (wasSynchronouslyLoaded || frame != null) {
                       return child;
                     }
-                    return const Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    );
+                    return widget.placeholder;
                   },
               errorBuilder:
                   (BuildContext context, Object error, StackTrace? stackTrace) {
-                    _handleForbidden(error);
                     return widget.placeholder;
                   },
-            ),
+            );
+          }
+
+          return Image.network(
+            resolvedImageUrl,
+            width: widget.width,
+            height: widget.height,
+            fit: widget.fit,
+            headers: widget.headers,
+            cacheWidth: cacheTarget.width,
+            cacheHeight: cacheTarget.height,
+            filterQuality: FilterQuality.low,
+            gaplessPlayback: true,
+            frameBuilder:
+                (
+                  BuildContext context,
+                  Widget child,
+                  int? frame,
+                  bool wasSynchronouslyLoaded,
+                ) {
+                  if (wasSynchronouslyLoaded || frame != null) {
+                    return child;
+                  }
+                  return widget.placeholder;
+                },
+            errorBuilder:
+                (BuildContext context, Object error, StackTrace? stackTrace) {
+                  _handleForbidden(error);
+                  return widget.placeholder;
+                },
+          );
+        },
+      ),
     );
   }
 
@@ -142,4 +168,53 @@ class _AppRemoteImageState extends State<AppRemoteImage> {
     }
     return File(value);
   }
+
+  _CacheTarget _resolveCacheTarget({
+    required BuildContext context,
+    required BoxConstraints constraints,
+  }) {
+    final double dpr = MediaQuery.maybeOf(context)?.devicePixelRatio ?? 2.0;
+    final int? width = _resolveDimension(
+      explicit: widget.width,
+      constrained: constraints.hasBoundedWidth ? constraints.maxWidth : null,
+      dpr: dpr,
+    );
+    final int? height = _resolveDimension(
+      explicit: widget.height,
+      constrained: constraints.hasBoundedHeight ? constraints.maxHeight : null,
+      dpr: dpr,
+    );
+    return _CacheTarget(width: width, height: height);
+  }
+
+  int? _resolveDimension({
+    required double? explicit,
+    required double? constrained,
+    required double dpr,
+  }) {
+    final double? logical = _firstFinitePositive(explicit) ??
+        _firstFinitePositive(constrained);
+    if (logical == null) {
+      return null;
+    }
+    final int physical = (logical * dpr).round();
+    if (physical <= 0) {
+      return null;
+    }
+    return physical.clamp(64, 2048);
+  }
+
+  double? _firstFinitePositive(double? value) {
+    if (value == null || value.isNaN || value.isInfinite || value <= 0) {
+      return null;
+    }
+    return value;
+  }
+}
+
+class _CacheTarget {
+  const _CacheTarget({required this.width, required this.height});
+
+  final int? width;
+  final int? height;
 }

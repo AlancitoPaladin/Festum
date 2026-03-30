@@ -10,6 +10,7 @@ import 'package:festum/features/client/models/client_tab.dart';
 import 'package:festum/features/client/views/client_cart_view.dart';
 import 'package:festum/features/client/views/client_checkout_success_view.dart';
 import 'package:festum/features/client/views/client_home_view.dart';
+import 'package:festum/features/client/views/client_notifications_view.dart';
 import 'package:festum/features/client/views/client_orders_view.dart';
 import 'package:festum/features/client/views/client_service_detail_view.dart';
 import 'package:festum/features/client/views/client_services_by_category_view.dart';
@@ -124,6 +125,10 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.clientOrders,
         builder: (context, state) => const ClientOrdersView(),
+      ),
+      GoRoute(
+        path: AppRoutes.clientNotifications,
+        builder: (context, state) => const ClientNotificationsView(),
       ),
       GoRoute(
         path: AppRoutes.clientCheckoutSuccess,

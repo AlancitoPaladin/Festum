@@ -12,6 +12,7 @@ class AppRoutes {
       '/client/services/:category/:serviceId';
   static const String clientCart = '/client/cart';
   static const String clientOrders = '/client/orders';
+  static const String clientNotifications = '/client/notifications';
   static const String clientCheckoutSuccess =
       '/client/checkout-success/:orderId';
   static const String providerHome = '/provider/home';

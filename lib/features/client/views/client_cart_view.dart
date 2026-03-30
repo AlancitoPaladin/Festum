@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
+import 'package:festum/core/network/api_error_mapper.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/features/client/models/client_cart_item.dart';
 import 'package:festum/features/client/models/client_tab.dart';
@@ -88,12 +89,15 @@ class _ClientCartViewState extends State<ClientCartView> {
       if (!showLoader) {
         ClientFeedback.showMessage(context, message: 'Carrito actualizado');
       }
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _errorMessage = 'No pudimos cargar tu carrito.';
+        _errorMessage = ApiErrorMapper.toUserMessage(
+          error,
+          fallback: 'No pudimos cargar tu carrito.',
+        );
         _isLoading = false;
       });
     }
@@ -379,13 +383,16 @@ class _ClientCartViewState extends State<ClientCartView> {
           totalLabel: createdOrder.totalLabel,
         ),
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
       ClientFeedback.showMessage(
         context,
-        message: 'No se pudo completar la orden. Intenta nuevamente.',
+        message: ApiErrorMapper.toUserMessage(
+          error,
+          fallback: 'No se pudo completar la orden. Intenta nuevamente.',
+        ),
       );
       HapticFeedback.selectionClick();
     } finally {
@@ -463,6 +470,7 @@ class _ClientCartViewState extends State<ClientCartView> {
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
+      cacheExtent: 700,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       itemCount: _cartItems.length + 1,
       separatorBuilder: (_, _) => const SizedBox(height: 10),

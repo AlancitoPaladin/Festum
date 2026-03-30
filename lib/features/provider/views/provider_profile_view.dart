@@ -23,6 +23,7 @@ class ProviderProfileView extends StatelessWidget {
         locator(),
         locator(),
         locator(),
+        locator(),
       ),
       onViewModelReady: (ProviderProfileViewModel model) => model.initialise(),
       builder: (context, model, child) => Scaffold(

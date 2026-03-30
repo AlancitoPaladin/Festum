@@ -4,6 +4,7 @@ import 'package:festum/core/services/auth_state_service.dart';
 import 'package:festum/core/services/provider_branding_service.dart';
 import 'package:festum/core/services/provider_business_info_state_service.dart';
 import 'package:festum/core/services/provider_reactivity_service.dart';
+import 'package:festum/core/services/push_notifications_service.dart';
 import 'package:festum/features/provider/models/provider_business_profile.dart';
 import 'package:festum/features/provider/models/provider_service.dart';
 import 'package:festum/features/provider/repositories/provider_business_repository.dart';
@@ -19,6 +20,7 @@ class ProviderProfileViewModel extends BaseViewModel {
     this._providerBusinessInfoStateService,
     this._providerBrandingService,
     this._providerReactivityService,
+    this._pushNotificationsService,
   ) {
     _lastBusinessRevision = _providerReactivityService.businessRevision;
     _lastServicesRevision = _providerReactivityService.servicesRevision;
@@ -31,6 +33,7 @@ class ProviderProfileViewModel extends BaseViewModel {
   final ProviderBusinessInfoStateService _providerBusinessInfoStateService;
   final ProviderBrandingService _providerBrandingService;
   final ProviderReactivityService _providerReactivityService;
+  final PushNotificationsService _pushNotificationsService;
 
   ProviderBusinessProfile? _profile;
   List<ProviderService> _services = <ProviderService>[];
@@ -110,6 +113,7 @@ class ProviderProfileViewModel extends BaseViewModel {
   }
 
   Future<void> logout() async {
+    await _pushNotificationsService.unregisterCurrentDeviceToken();
     await _providerBusinessInfoStateService.resetBusinessInfoProgress();
     await _providerBrandingService.clear();
     await _providerReactivityService.clear();

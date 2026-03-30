@@ -2,12 +2,15 @@ import 'dart:ui';
 
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
+import 'package:festum/core/network/api_error_mapper.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/app_remote_image.dart';
+import 'package:festum/features/client/models/client_order_item.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
 import 'package:festum/features/client/models/client_tab.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
 import 'package:festum/features/client/usecases/add_service_to_cart_use_case.dart';
+import 'package:festum/features/client/usecases/get_client_orders_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_service_by_id_use_case.dart';
 import 'package:festum/features/client/usecases/is_service_in_cart_use_case.dart';
 import 'package:festum/features/client/widgets/client_feedback.dart';
@@ -34,12 +37,14 @@ class ClientServiceDetailView extends StatefulWidget {
 
 class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
   late final GetClientServiceByIdUseCase _getClientServiceByIdUseCase;
+  late final GetClientOrdersUseCase _getClientOrdersUseCase;
   late final AddServiceToCartUseCase _addServiceToCartUseCase;
   late final IsServiceInCartUseCase _isServiceInCartUseCase;
 
   bool _isLoading = true;
   bool _isAddingToCart = false;
   bool _isInCart = false;
+  bool _isBlockedByActiveOrder = false;
   String? _errorMessage;
   ClientServiceItem? _service;
   Set<String> _selectedProductIds = <String>{};
@@ -49,6 +54,7 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
   void initState() {
     super.initState();
     _getClientServiceByIdUseCase = locator<GetClientServiceByIdUseCase>();
+    _getClientOrdersUseCase = locator<GetClientOrdersUseCase>();
     _addServiceToCartUseCase = locator<AddServiceToCartUseCase>();
     _isServiceInCartUseCase = locator<IsServiceInCartUseCase>();
     _loadDetail(showLoader: true);
@@ -82,17 +88,37 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
         _didRefreshAfterImage403 = false;
         _selectedProductIds = <String>{};
       });
-      final bool isInCart = await _isServiceInCartUseCase(result.id);
-      if (!mounted) {
-        return;
-      }
-      setState(() => _isInCart = isInCart);
-    } catch (_) {
+      final List<dynamic> lockSnapshot = await Future.wait<dynamic>(<Future<dynamic>>[
+        _isServiceInCartUseCase(result.id),
+        _getClientOrdersUseCase(),
+      ]);
+      final bool isInCart = lockSnapshot[0] as bool;
+      final List<ClientOrderItem> orders =
+          lockSnapshot[1] as List<ClientOrderItem>;
+      final bool isBlockedByActiveOrder = orders
+          .where(
+            (ClientOrderItem order) =>
+                order.status != ClientOrderStatus.cancelled &&
+                order.status != ClientOrderStatus.completed,
+          )
+          .expand((ClientOrderItem order) => order.items)
+          .any((ClientOrderLineItem item) => item.serviceId == result.id);
       if (!mounted) {
         return;
       }
       setState(() {
-        _errorMessage = 'No pudimos cargar el detalle del servicio.';
+        _isInCart = isInCart;
+        _isBlockedByActiveOrder = isBlockedByActiveOrder;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = ApiErrorMapper.toUserMessage(
+          error,
+          fallback: 'No pudimos cargar el detalle del servicio.',
+        );
         _isLoading = false;
       });
     }
@@ -109,6 +135,15 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
   Future<void> _addCurrentServiceToCart() async {
     final ClientServiceItem? service = _service;
     if (service == null || _isInCart || _isAddingToCart) {
+      return;
+    }
+    if (_isBlockedByActiveOrder) {
+      ClientFeedback.showMessage(
+        context,
+        message:
+            'Este servicio ya tiene una orden activa. Podrás solicitarlo de nuevo cuando se complete o se cancele.',
+      );
+      HapticFeedback.selectionClick();
       return;
     }
 
@@ -131,16 +166,33 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
               .join(', ');
 
     setState(() => _isAddingToCart = true);
-    final bool added = await _addServiceToCartUseCase(
-      serviceId: service.id,
-      name: itemName,
-      unitPriceCents: itemUnitPriceCents,
-      productId: primaryProduct?.id,
-      productName: selectedProductsLabel,
-      selectedProductIds: selectedProducts
-          .map((ClientServiceProduct p) => p.id)
-          .toList(),
-    );
+    bool added = false;
+    try {
+      added = await _addServiceToCartUseCase(
+        serviceId: service.id,
+        name: itemName,
+        unitPriceCents: itemUnitPriceCents,
+        productId: primaryProduct?.id,
+        productName: selectedProductsLabel,
+        selectedProductIds: selectedProducts
+            .map((ClientServiceProduct p) => p.id)
+            .toList(),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isAddingToCart = false);
+      ClientFeedback.showMessage(
+        context,
+        message: ApiErrorMapper.toUserMessage(
+          error,
+          fallback: 'No se pudo agregar el servicio al carrito.',
+        ),
+      );
+      HapticFeedback.selectionClick();
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -324,6 +376,7 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
             child: _BottomCta(
               priceLabel: ctaPriceLabel,
               isAdded: _isInCart,
+              isBlockedByOrder: _isBlockedByActiveOrder,
               isAdding: _isAddingToCart,
               onAdd: _addCurrentServiceToCart,
               onOpenCart: () => context.go(AppRoutes.clientCart),
@@ -756,6 +809,7 @@ class _BottomCta extends StatelessWidget {
   const _BottomCta({
     required this.priceLabel,
     required this.isAdded,
+    required this.isBlockedByOrder,
     required this.isAdding,
     required this.onAdd,
     required this.onOpenCart,
@@ -763,6 +817,7 @@ class _BottomCta extends StatelessWidget {
 
   final String priceLabel;
   final bool isAdded;
+  final bool isBlockedByOrder;
   final bool isAdding;
   final VoidCallback onAdd;
   final VoidCallback onOpenCart;
@@ -807,16 +862,24 @@ class _BottomCta extends StatelessWidget {
                   ),
                 ),
                 FilledButton.icon(
-                  onPressed: isAdding ? null : (isAdded ? onOpenCart : onAdd),
+                  onPressed: isAdding
+                      ? null
+                      : (isBlockedByOrder
+                            ? null
+                            : (isAdded ? onOpenCart : onAdd)),
                   icon: Icon(
-                    isAdded
+                    isBlockedByOrder
+                        ? Icons.lock_clock_rounded
+                        : isAdded
                         ? Icons.shopping_cart_checkout_rounded
                         : isAdding
                         ? Icons.hourglass_top_rounded
                         : Icons.add_shopping_cart_rounded,
                   ),
                   label: Text(
-                    isAdded
+                    isBlockedByOrder
+                        ? 'Orden activa'
+                        : isAdded
                         ? 'Ver carrito'
                         : (isAdding ? 'Agregando...' : 'Agregar'),
                   ),

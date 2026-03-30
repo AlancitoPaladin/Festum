@@ -1,10 +1,12 @@
 import 'package:festum/app/router/app_router.dart';
 import 'package:festum/core/di/app_locator.dart';
+import 'package:festum/core/services/push_notifications_service.dart';
 import 'package:flutter/material.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await setupLocator();
+  await locator<PushNotificationsService>().initialize();
 
   final router = locator<AppRouter>().router;
 
@@ -12,11 +14,7 @@ Future<void> main() async {
     MaterialApp.router(
       debugShowCheckedModeBanner: false,
       routerConfig: router,
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'PlusJakartaSans',
-      ),
+      theme: ThemeData(useMaterial3: true, fontFamily: 'PlusJakartaSans'),
     ),
   );
 }
- 

@@ -1,6 +1,7 @@
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/services/auth_state_service.dart';
+import 'package:festum/core/services/push_notifications_service.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/features/home/viewmodels/home_viewmodel.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +19,8 @@ class HomeView extends StackedView<HomeViewModel> {
         actions: [
           TextButton(
             onPressed: () async {
+              await locator<PushNotificationsService>()
+                  .unregisterCurrentDeviceToken();
               await locator<AuthStateService>().signOut();
               if (!context.mounted) {
                 return;

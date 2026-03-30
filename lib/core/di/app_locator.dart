@@ -9,6 +9,7 @@ import 'package:festum/core/services/auth_state_service.dart';
 import 'package:festum/core/services/provider_branding_service.dart';
 import 'package:festum/core/services/provider_business_info_state_service.dart';
 import 'package:festum/core/services/provider_reactivity_service.dart';
+import 'package:festum/core/services/push_notifications_service.dart';
 import 'package:festum/core/services/registration_state_service.dart';
 import 'package:festum/features/auth/repositories/auth_repository.dart';
 import 'package:festum/features/client/repositories/client_cart_repository.dart';
@@ -391,7 +392,7 @@ Future<void> setupLocator() async {
     () => RegistrationStateService(locator<SharedPreferences>()),
   );
   locator.registerLazySingleton<ClientTabUiStateService>(
-    ClientTabUiStateService.new,
+    () => ClientTabUiStateService(locator<SharedPreferences>()),
   );
 
   locator.registerLazySingleton<AppRouter>(
@@ -399,6 +400,14 @@ Future<void> setupLocator() async {
       locator<AuthStateService>(),
       locator<RegistrationStateService>(),
       locator<ProviderBusinessInfoStateService>(),
+    ),
+  );
+  locator.registerLazySingleton<PushNotificationsService>(
+    () => PushNotificationsService(
+      locator<ApiClient>(),
+      locator<AuthStateService>(),
+      locator<AppRouter>(),
+      locator<ClientTabUiStateService>(),
     ),
   );
 }

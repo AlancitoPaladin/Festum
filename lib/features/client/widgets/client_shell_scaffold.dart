@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/services/auth_state_service.dart';
+import 'package:festum/core/services/push_notifications_service.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/features/client/models/client_tab.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
@@ -37,26 +38,54 @@ class ClientShellScaffold extends StatefulWidget {
 }
 
 class _ClientShellScaffoldState extends State<ClientShellScaffold> {
+  static const List<Duration> _pollingBackoffSteps = <Duration>[
+    Duration(seconds: 25),
+    Duration(seconds: 40),
+    Duration(seconds: 60),
+    Duration(seconds: 90),
+    Duration(seconds: 120),
+  ];
+
   bool _isBottomBarVisible = true;
   late final ClientTabUiStateService _tabUiStateService;
   late final GetClientOrdersUseCase _getClientOrdersUseCase;
   Timer? _ordersPollingTimer;
   bool _isSyncingNotifications = false;
+  int _consecutivePollingFailures = 0;
+  bool _isAppInForeground = true;
+  late final _LifecycleObserver _lifecycleObserver;
 
   @override
   void initState() {
     super.initState();
+    _lifecycleObserver = _LifecycleObserver(
+      onStateChanged: (AppLifecycleState state) {
+        if (!mounted) {
+          return;
+        }
+        if (state == AppLifecycleState.resumed) {
+          _isAppInForeground = true;
+          _ordersPollingTimer?.cancel();
+          _runPollingCycle();
+          return;
+        }
+        if (state == AppLifecycleState.inactive ||
+            state == AppLifecycleState.paused ||
+            state == AppLifecycleState.hidden) {
+          _isAppInForeground = false;
+          _ordersPollingTimer?.cancel();
+        }
+      },
+    );
+    WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _tabUiStateService = locator<ClientTabUiStateService>();
     _getClientOrdersUseCase = locator<GetClientOrdersUseCase>();
-    _syncOrderNotifications();
-    _ordersPollingTimer = Timer.periodic(
-      const Duration(seconds: 25),
-      (_) => _syncOrderNotifications(),
-    );
+    _runPollingCycle();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     _ordersPollingTimer?.cancel();
     super.dispose();
   }
@@ -110,10 +139,7 @@ class _ClientShellScaffoldState extends State<ClientShellScaffold> {
                       tooltip: 'Notificaciones',
                       color: AppColors.primaryText,
                       onPressed: () {
-                        _tabUiStateService.clearOrderNotifications();
-                        if (widget.currentTab != ClientTab.orders) {
-                          context.go(AppRoutes.clientOrders);
-                        }
+                        context.push(AppRoutes.clientNotifications);
                       },
                       icon: Stack(
                         clipBehavior: Clip.none,
@@ -163,6 +189,8 @@ class _ClientShellScaffoldState extends State<ClientShellScaffold> {
                     if (!confirmed || !context.mounted) {
                       return;
                     }
+                    await locator<PushNotificationsService>()
+                        .unregisterCurrentDeviceToken();
                     await locator<AuthStateService>().signOut();
                     if (!context.mounted) {
                       return;
@@ -215,19 +243,52 @@ class _ClientShellScaffoldState extends State<ClientShellScaffold> {
     context.go(tab.route);
   }
 
-  Future<void> _syncOrderNotifications() async {
+  Future<bool> _syncOrderNotifications() async {
     if (_isSyncingNotifications) {
-      return;
+      return true;
     }
     _isSyncingNotifications = true;
     try {
       final orders = await _getClientOrdersUseCase();
       _tabUiStateService.ingestOrders(orders);
+      return true;
     } catch (_) {
       // Best-effort sync: UI should continue even if orders are unavailable.
+      return false;
     } finally {
       _isSyncingNotifications = false;
     }
+  }
+
+  Future<void> _runPollingCycle() async {
+    if (!mounted || !_isAppInForeground) {
+      return;
+    }
+    final bool success = await _syncOrderNotifications();
+    if (!mounted) {
+      return;
+    }
+    if (success) {
+      _consecutivePollingFailures = 0;
+    } else {
+      _consecutivePollingFailures += 1;
+    }
+    _scheduleNextPollingCycle();
+  }
+
+  void _scheduleNextPollingCycle() {
+    if (!mounted || !_isAppInForeground) {
+      return;
+    }
+    _ordersPollingTimer?.cancel();
+    final int stepIndex = _consecutivePollingFailures.clamp(
+      0,
+      _pollingBackoffSteps.length - 1,
+    );
+    final Duration delay = _pollingBackoffSteps[stepIndex];
+    _ordersPollingTimer = Timer(delay, () {
+      _runPollingCycle();
+    });
   }
 
   Future<bool> _confirmSignOut(BuildContext context) async {
@@ -259,5 +320,16 @@ class _ClientShellScaffoldState extends State<ClientShellScaffold> {
       return;
     }
     setState(() {});
+  }
+}
+
+class _LifecycleObserver with WidgetsBindingObserver {
+  _LifecycleObserver({required this.onStateChanged});
+
+  final ValueChanged<AppLifecycleState> onStateChanged;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    onStateChanged(state);
   }
 }

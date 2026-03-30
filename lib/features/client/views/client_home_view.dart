@@ -1,14 +1,19 @@
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
+import 'package:festum/core/network/api_error_mapper.dart';
+import 'package:festum/core/network/api_url_resolver.dart';
 import 'package:festum/core/services/auth_state_service.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/app_remote_image.dart';
+import 'package:festum/features/client/models/client_cart_item.dart';
+import 'package:festum/features/client/models/client_order_item.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
 import 'package:festum/features/client/models/client_tab.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
 import 'package:festum/features/client/usecases/add_service_to_cart_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_cart_items_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_home_sections_use_case.dart';
+import 'package:festum/features/client/usecases/get_client_orders_use_case.dart';
 import 'package:festum/features/client/widgets/client_feedback.dart';
 import 'package:festum/features/client/widgets/client_shell_scaffold.dart';
 import 'package:festum/features/client/widgets/client_status_view.dart';
@@ -29,6 +34,7 @@ class ClientHomeView extends StatefulWidget {
 class _ClientHomeViewState extends State<ClientHomeView> {
   late final GetClientHomeSectionsUseCase _getClientHomeSectionsUseCase;
   late final GetClientCartItemsUseCase _getClientCartItemsUseCase;
+  late final GetClientOrdersUseCase _getClientOrdersUseCase;
   late final AddServiceToCartUseCase _addServiceToCartUseCase;
   late final ClientTabUiStateService _tabUiStateService;
   late final ScrollController _scrollController;
@@ -38,6 +44,7 @@ class _ClientHomeViewState extends State<ClientHomeView> {
   Map<ClientServiceCategory, List<ClientServiceItem>> _sections =
       <ClientServiceCategory, List<ClientServiceItem>>{};
   Set<String> _cartServiceIds = <String>{};
+  Set<String> _activeOrderServiceIds = <String>{};
   Set<String> _addingServiceIds = <String>{};
   Set<String> _recentlyAddedServiceIds = <String>{};
   Set<String> _addErrorServiceIds = <String>{};
@@ -48,6 +55,7 @@ class _ClientHomeViewState extends State<ClientHomeView> {
     super.initState();
     _getClientHomeSectionsUseCase = locator<GetClientHomeSectionsUseCase>();
     _getClientCartItemsUseCase = locator<GetClientCartItemsUseCase>();
+    _getClientOrdersUseCase = locator<GetClientOrdersUseCase>();
     _addServiceToCartUseCase = locator<AddServiceToCartUseCase>();
     _tabUiStateService = locator<ClientTabUiStateService>();
     _scrollController = ScrollController(
@@ -90,16 +98,20 @@ class _ClientHomeViewState extends State<ClientHomeView> {
         _isLoading = false;
         _didRefreshAfterImage403 = false;
       });
+      _precacheTopHomeImages(result);
       if (!showLoader) {
         ClientFeedback.showMessage(context, message: 'Inicio actualizado');
       }
-      await _syncCartState();
-    } catch (_) {
+      await _syncClientLocks();
+    } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _errorMessage = 'No pudimos cargar los servicios por categoría.';
+        _errorMessage = ApiErrorMapper.toUserMessage(
+          error,
+          fallback: 'No pudimos cargar los servicios por categoría.',
+        );
         _isLoading = false;
       });
     }
@@ -113,15 +125,68 @@ class _ClientHomeViewState extends State<ClientHomeView> {
     await _loadHomeSections(showLoader: false);
   }
 
-  Future<void> _syncCartState() async {
-    final cartItems = await _getClientCartItemsUseCase();
+  Future<void> _syncClientLocks() async {
+    final List<ClientCartItem> cartItems = await _getClientCartItemsUseCase();
+    final List<ClientOrderItem> orders = await _getClientOrdersUseCase();
+    final Set<String> activeOrderServiceIds = orders
+        .where(
+          (ClientOrderItem order) =>
+              order.status != ClientOrderStatus.cancelled &&
+              order.status != ClientOrderStatus.completed,
+        )
+        .expand((ClientOrderItem order) => order.items)
+        .map((item) => item.serviceId.trim())
+        .where((String serviceId) => serviceId.isNotEmpty)
+        .toSet();
     if (!mounted) {
       return;
     }
     setState(() {
-      _cartServiceIds = cartItems.map((item) => item.id).toSet();
+      _cartServiceIds = cartItems.map((ClientCartItem item) => item.id).toSet();
+      _activeOrderServiceIds = activeOrderServiceIds;
     });
     _tabUiStateService.setCartCount(cartItems.length);
+  }
+
+  void _precacheTopHomeImages(
+    Map<ClientServiceCategory, List<ClientServiceItem>> sections,
+  ) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final Set<String> candidateUrls = <String>{};
+      for (final ClientServiceCategory category in ClientServiceCategory.values) {
+        final List<ClientServiceItem> items =
+            sections[category] ?? const <ClientServiceItem>[];
+        for (final ClientServiceItem item in items) {
+          final String rawUrl = item.imageUrl.trim();
+          if (rawUrl.isEmpty) {
+            continue;
+          }
+          final String resolved = resolveApiAssetUrl(rawUrl).trim();
+          if (resolved.isEmpty ||
+              resolved.startsWith('file:') ||
+              resolved.startsWith('data:')) {
+            continue;
+          }
+          final Uri? uri = Uri.tryParse(resolved);
+          if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+            continue;
+          }
+          candidateUrls.add(resolved);
+          if (candidateUrls.length >= 3) {
+            break;
+          }
+        }
+        if (candidateUrls.length >= 3) {
+          break;
+        }
+      }
+      for (final String url in candidateUrls) {
+        precacheImage(NetworkImage(url), context);
+      }
+    });
   }
 
   Future<void> _addService({
@@ -147,6 +212,15 @@ class _ClientHomeViewState extends State<ClientHomeView> {
       HapticFeedback.selectionClick();
       return;
     }
+    if (_activeOrderServiceIds.contains(item.id)) {
+      ClientFeedback.showMessage(
+        context,
+        message:
+            'Este servicio ya tiene una orden activa. Podrás solicitarlo de nuevo cuando se complete o se cancele.',
+      );
+      HapticFeedback.selectionClick();
+      return;
+    }
 
     setState(() {
       _addingServiceIds = <String>{..._addingServiceIds, item.id};
@@ -154,11 +228,32 @@ class _ClientHomeViewState extends State<ClientHomeView> {
       _recentlyAddedServiceIds = <String>{..._recentlyAddedServiceIds}
         ..remove(item.id);
     });
-    final bool added = await _addServiceToCartUseCase(
-      serviceId: item.id,
-      name: item.name,
-      unitPriceCents: item.unitPriceCents,
-    );
+    bool added = false;
+    try {
+      added = await _addServiceToCartUseCase(
+        serviceId: item.id,
+        name: item.name,
+        unitPriceCents: item.unitPriceCents,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _addingServiceIds = <String>{..._addingServiceIds}..remove(item.id);
+        _addErrorServiceIds = <String>{..._addErrorServiceIds, item.id};
+      });
+      ClientFeedback.showMessage(
+        context,
+        message: ApiErrorMapper.toUserMessage(
+          error,
+          fallback: 'No se pudo agregar el servicio al carrito.',
+        ),
+      );
+      HapticFeedback.selectionClick();
+      _clearTransientAddState(item.id);
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -175,7 +270,7 @@ class _ClientHomeViewState extends State<ClientHomeView> {
         message: 'Este servicio ya está en el carrito.',
       );
       HapticFeedback.selectionClick();
-      await _syncCartState();
+      await _syncClientLocks();
       return;
     }
 
@@ -260,6 +355,7 @@ class _ClientHomeViewState extends State<ClientHomeView> {
     return ListView(
       controller: _scrollController,
       physics: const BouncingScrollPhysics(),
+      cacheExtent: 900,
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 120),
       children: visibleCategories
           .map(
@@ -269,6 +365,7 @@ class _ClientHomeViewState extends State<ClientHomeView> {
                 category: category,
                 services: _sections[category] ?? const <ClientServiceItem>[],
                 cartServiceIds: _cartServiceIds,
+                activeOrderServiceIds: _activeOrderServiceIds,
                 addingServiceIds: _addingServiceIds,
                 recentlyAddedServiceIds: _recentlyAddedServiceIds,
                 addErrorServiceIds: _addErrorServiceIds,
@@ -290,6 +387,7 @@ class _ServiceCategorySection extends StatelessWidget {
     required this.category,
     required this.services,
     required this.cartServiceIds,
+    required this.activeOrderServiceIds,
     required this.addingServiceIds,
     required this.recentlyAddedServiceIds,
     required this.addErrorServiceIds,
@@ -301,6 +399,7 @@ class _ServiceCategorySection extends StatelessWidget {
   final ClientServiceCategory category;
   final List<ClientServiceItem> services;
   final Set<String> cartServiceIds;
+  final Set<String> activeOrderServiceIds;
   final Set<String> addingServiceIds;
   final Set<String> recentlyAddedServiceIds;
   final Set<String> addErrorServiceIds;
@@ -340,6 +439,7 @@ class _ServiceCategorySection extends StatelessWidget {
               height: 210,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
+                cacheExtent: 520,
                 itemCount: services.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 10),
                 itemBuilder: (BuildContext context, int index) {
@@ -349,6 +449,7 @@ class _ServiceCategorySection extends StatelessWidget {
                     child: _ServicePreviewCard(
                       item: item,
                       isAdded: cartServiceIds.contains(item.id),
+                      isBlockedByOrder: activeOrderServiceIds.contains(item.id),
                       isAdding: addingServiceIds.contains(item.id),
                       hasRecentSuccess: recentlyAddedServiceIds.contains(
                         item.id,
@@ -381,6 +482,7 @@ class _ServicePreviewCard extends StatelessWidget {
   const _ServicePreviewCard({
     required this.item,
     required this.isAdded,
+    required this.isBlockedByOrder,
     required this.isAdding,
     required this.hasRecentSuccess,
     required this.hasAddError,
@@ -392,6 +494,7 @@ class _ServicePreviewCard extends StatelessWidget {
 
   final ClientServiceItem item;
   final bool isAdded;
+  final bool isBlockedByOrder;
   final bool isAdding;
   final bool hasRecentSuccess;
   final bool hasAddError;
@@ -493,7 +596,11 @@ class _ServicePreviewCard extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.tonalIcon(
-                    onPressed: isAdding ? null : (isAdded ? onOpenCart : onAdd),
+                    onPressed: isAdding
+                        ? null
+                        : (isBlockedByOrder
+                              ? null
+                              : (isAdded ? onOpenCart : onAdd)),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -521,6 +628,8 @@ class _ServicePreviewCard extends StatelessWidget {
                             ? Icons.error_outline_rounded
                             : hasRecentSuccess
                             ? Icons.check_circle_rounded
+                            : isBlockedByOrder
+                            ? Icons.lock_clock_rounded
                             : isAdded
                             ? Icons.shopping_cart_checkout_rounded
                             : isAdding
@@ -534,6 +643,8 @@ class _ServicePreviewCard extends StatelessWidget {
                           ? 'Intenta de nuevo'
                           : hasRecentSuccess
                           ? 'Agregado'
+                          : isBlockedByOrder
+                          ? 'Orden activa'
                           : isAdded
                           ? 'Ver carrito'
                           : isAdding

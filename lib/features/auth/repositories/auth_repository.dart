@@ -1,6 +1,6 @@
-import 'package:dio/dio.dart';
 import 'package:festum/core/models/account_role.dart';
 import 'package:festum/core/network/api_client.dart';
+import 'package:festum/core/network/api_error_mapper.dart';
 import 'package:festum/features/auth/models/auth_session.dart';
 
 class AuthRepository {
@@ -46,23 +46,15 @@ class AuthRepository {
   }
 
   static String mapApiError(Object error) {
-    if (error is DioException) {
-      final dynamic data = error.response?.data;
-      if (data is Map<String, dynamic>) {
-        final dynamic detail = data['detail'];
-        if (detail is String && detail.trim().isNotEmpty) {
-          return detail;
-        }
-      }
-
-      return 'Error de conexión con la API. Verifica servidor y credenciales.';
-    }
-
-    if (error is FormatException) {
-      return error.message;
-    }
-
-    return 'Ocurrió un error inesperado.';
+    return ApiErrorMapper.toUserMessage(
+      error,
+      fallback:
+          'Error de conexión con la API. Verifica servidor y credenciales.',
+      statusOverrides: const <int, String>{
+        401: 'Correo o contraseña incorrectos.',
+        409: 'Este correo ya está registrado.',
+      },
+    );
   }
 
   AuthSession _extractSession(Map<String, dynamic> response) {
