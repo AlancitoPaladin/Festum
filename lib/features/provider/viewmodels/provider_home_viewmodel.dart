@@ -10,7 +10,6 @@ import 'package:festum/features/provider/usecases/clear_provider_notifications_u
 import 'package:festum/features/provider/usecases/get_provider_home_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_notifications_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_product_reservations_use_case.dart';
-import 'package:festum/features/provider/usecases/mark_all_provider_notifications_as_read_use_case.dart';
 import 'package:festum/features/provider/usecases/mark_provider_notification_as_read_use_case.dart';
 import 'package:stacked/stacked.dart';
 
@@ -20,7 +19,6 @@ class ProviderHomeViewModel extends BaseViewModel {
     this._getProviderNotificationsUseCase,
     this._getProviderProductReservationsUseCase,
     this._markProviderNotificationAsReadUseCase,
-    this._markAllProviderNotificationsAsReadUseCase,
     this._clearProviderNotificationsUseCase,
     this._providerReactivityService,
   ) {
@@ -35,8 +33,6 @@ class ProviderHomeViewModel extends BaseViewModel {
   _getProviderProductReservationsUseCase;
   final MarkProviderNotificationAsReadUseCase
   _markProviderNotificationAsReadUseCase;
-  final MarkAllProviderNotificationsAsReadUseCase
-  _markAllProviderNotificationsAsReadUseCase;
   final ClearProviderNotificationsUseCase _clearProviderNotificationsUseCase;
   final ProviderReactivityService _providerReactivityService;
 
@@ -95,16 +91,19 @@ class ProviderHomeViewModel extends BaseViewModel {
     });
   }
 
-  Future<void> markAllAsRead() async {
-    await _runNotificationAction(() async {
-      await _markAllProviderNotificationsAsReadUseCase();
-    });
-  }
-
   Future<void> clearAll() async {
-    await _runNotificationAction(() async {
+    final List<ProviderNotification> previousNotifications =
+        List<ProviderNotification>.from(_notifications);
+    _notifications = <ProviderNotification>[];
+    notifyListeners();
+
+    try {
       await _clearProviderNotificationsUseCase();
-    });
+      await _reloadNotifications();
+    } catch (_) {
+      _notifications = previousNotifications;
+      notifyListeners();
+    }
   }
 
   Future<void> refresh() async {

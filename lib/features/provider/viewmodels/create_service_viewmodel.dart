@@ -77,7 +77,7 @@ class CreateServiceViewModel extends BaseViewModel {
 
   String get previewSubtitle {
     final String value = _formData.subtitle.trim();
-    return value.isEmpty ? 'Sin descripcion breve' : value;
+    return value.isEmpty ? 'Sin descripción breve.' : value;
   }
 
   String get previewBadge {
@@ -98,9 +98,9 @@ class CreateServiceViewModel extends BaseViewModel {
       case ServiceCategory.banquet:
         return 'Catering';
       case ServiceCategory.dj:
-        return 'Musica';
+        return 'Música';
       case ServiceCategory.decoration:
-        return 'Decoracion';
+        return 'Decoración';
       case ServiceCategory.photography:
         return 'Foto y video';
       case ServiceCategory.entertainment:
@@ -269,13 +269,13 @@ class CreateServiceViewModel extends BaseViewModel {
 
   bool _validate() {
     if (_formData.category == null) {
-      _fieldErrors['category'] = 'Selecciona una categoria.';
+      _fieldErrors['category'] = 'Selecciona una categoría.';
     }
     if (_formData.name.trim().isEmpty) {
       _fieldErrors['name'] = 'El nombre es obligatorio.';
     }
     if (_formData.subtitle.trim().isEmpty) {
-      _fieldErrors['subtitle'] = 'El subtitulo es obligatorio.';
+      _fieldErrors['subtitle'] = 'El subtítulo es obligatorio.';
     }
     if (_formData.unitPriceCents <= 0) {
       _fieldErrors['unit_price_cents'] =

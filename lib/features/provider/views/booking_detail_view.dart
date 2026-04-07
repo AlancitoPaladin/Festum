@@ -51,7 +51,7 @@ class BookingDetailView extends StatelessWidget {
                 ],
                 _buildCustomerHeader(currentBooking),
                 const SizedBox(height: 32),
-                _buildInfoSection('Informacion del evento', [
+                _buildInfoSection('Información del evento', [
                   _buildInfoRow(
                     Icons.event_outlined,
                     'Fecha',

@@ -88,9 +88,9 @@ class ProviderServiceUpsertRequest {
       case ServiceCategory.banquet:
         return 'Catering';
       case ServiceCategory.dj:
-        return 'Musica';
+        return 'Música';
       case ServiceCategory.decoration:
-        return 'Decoracion';
+        return 'Decoración';
       case ServiceCategory.photography:
         return 'Foto y video';
       case ServiceCategory.entertainment:

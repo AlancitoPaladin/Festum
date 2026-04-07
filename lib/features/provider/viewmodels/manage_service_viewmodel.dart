@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:festum/core/services/provider_reactivity_service.dart';
 import 'package:festum/features/provider/models/provider_product.dart';
+import 'package:festum/features/provider/models/provider_service.dart';
 import 'package:festum/features/provider/models/service_category.dart';
 import 'package:festum/features/provider/repositories/provider_products_repository.dart';
 import 'package:festum/features/provider/usecases/delete_provider_service_product_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_service_products_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_services_use_case.dart';
 import 'package:stacked/stacked.dart';
 
 class ManageServiceViewModel extends BaseViewModel {
@@ -13,11 +15,13 @@ class ManageServiceViewModel extends BaseViewModel {
     required this.serviceId,
     required this.serviceName,
     required this.category,
+    required GetProviderServicesUseCase getProviderServicesUseCase,
     required GetProviderServiceProductsUseCase getProviderServiceProductsUseCase,
     required DeleteProviderServiceProductUseCase
     deleteProviderServiceProductUseCase,
     required ProviderReactivityService providerReactivityService,
-  }) : _getProviderServiceProductsUseCase = getProviderServiceProductsUseCase,
+  }) : _getProviderServicesUseCase = getProviderServicesUseCase,
+       _getProviderServiceProductsUseCase = getProviderServiceProductsUseCase,
        _deleteProviderServiceProductUseCase = deleteProviderServiceProductUseCase,
        _providerReactivityService = providerReactivityService {
     _lastProductsRevision = _providerReactivityService.productsRevision;
@@ -27,12 +31,14 @@ class ManageServiceViewModel extends BaseViewModel {
   final String serviceId;
   final String serviceName;
   final ServiceCategory category;
+  final GetProviderServicesUseCase _getProviderServicesUseCase;
   final GetProviderServiceProductsUseCase _getProviderServiceProductsUseCase;
   final DeleteProviderServiceProductUseCase
   _deleteProviderServiceProductUseCase;
   final ProviderReactivityService _providerReactivityService;
 
   List<ProviderProduct> _products = <ProviderProduct>[];
+  ProviderService? _service;
   final Set<String> _deletingProductIds = <String>{};
   String? _errorMessage;
   int _lastProductsRevision = 0;
@@ -40,6 +46,21 @@ class ManageServiceViewModel extends BaseViewModel {
 
   List<ProviderProduct> get products =>
       List<ProviderProduct>.unmodifiable(_products);
+  ProviderService? get service => _service;
+  bool get isPublished => _service?.isPublished ?? false;
+  bool get isInactive => _service?.isInactive ?? false;
+  String get statusLabel {
+    if (_service == null) {
+      return 'Cargando estado';
+    }
+    if (_service!.isPublished) {
+      return 'Publicado';
+    }
+    if (_service!.isInactive) {
+      return 'Inactivo';
+    }
+    return 'Borrador';
+  }
   String? get errorMessage => _errorMessage;
 
   bool isDeleting(String productId) => _deletingProductIds.contains(productId);
@@ -49,6 +70,15 @@ class ManageServiceViewModel extends BaseViewModel {
     _errorMessage = null;
 
     try {
+      final List<ProviderService> services = await _getProviderServicesUseCase();
+      ProviderService? matchedService;
+      for (final ProviderService item in services) {
+        if (item.id == serviceId) {
+          matchedService = item;
+          break;
+        }
+      }
+      _service = matchedService;
       _products = await _getProviderServiceProductsUseCase(serviceId);
       _lastProductsRevision = _providerReactivityService.productsRevision;
       _hasInitialized = true;

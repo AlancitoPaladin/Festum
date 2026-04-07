@@ -212,8 +212,8 @@ class EditServiceView extends StatelessWidget {
                         ? 'Precio actual de referencia'
                         : 'Precio pendiente de productos',
                     subtitle: model.formData.unitPriceCents > 0
-                        ? 'Este servicio conserva un precio de referencia mientras se termina de automatizar el calculo desde tus productos.'
-                        : 'Cuando tengas productos publicados, el cliente vera automaticamente el precio mas bajo disponible.',
+                        ? 'Este servicio conserva un precio de referencia mientras se termina de automatizar el cálculo desde tus productos.'
+                        : 'Cuando tengas productos publicados, el cliente verá automáticamente el precio más bajo disponible.',
                   ),
                   const SizedBox(height: 32),
                   const Text(
@@ -322,10 +322,13 @@ class EditServiceView extends StatelessWidget {
       ).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
-    final String label = model.isPublished ? 'publicado' : 'actualizado';
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('Estado $label.')));
+    ).showSnackBar(
+      const SnackBar(
+        content: Text('Estado listo. Guarda cambios para aplicarlo.'),
+      ),
+    );
   }
 
   Future<bool> _handleExit(
@@ -341,7 +344,7 @@ class EditServiceView extends StatelessWidget {
         return AlertDialog(
           title: const Text('Salir sin guardar'),
           content: const Text(
-            'Hay cambios sin guardar. Quieres salir y descartarlos?',
+            'Hay cambios sin guardar. ¿Quieres salir y descartarlos?',
           ),
           actions: <Widget>[
             TextButton(
@@ -417,7 +420,7 @@ class EditServiceView extends StatelessWidget {
     final int galleryCount = model.images.length;
 
     if (!hasMainImage && galleryCount == 0) {
-      return 'Pronto podras agregar fotos desde aqui.';
+      return 'Pronto podrás agregar fotos desde aquí.';
     }
 
     if (hasMainImage && galleryCount == 1) {
@@ -497,14 +500,14 @@ class EditServiceView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const Text(
-            'Categoria',
+            'Categoría',
             style: TextStyle(color: AppColors.secondaryText, fontSize: 13),
           ),
           DropdownButtonHideUnderline(
             child: DropdownButton<ServiceCategory>(
               value: model.selectedCategory,
               hint: const Text(
-                'Selecciona una categoria',
+                'Selecciona una categoría',
                 style: TextStyle(color: Colors.black26, fontSize: 14),
               ),
               isExpanded: true,
@@ -580,7 +583,7 @@ class _PricePreviewCard extends StatelessWidget {
             const SizedBox(height: 4),
           ],
           Text(
-            'Se enviara: unit_price_cents = $centsLabel',
+            'Se enviará: unit_price_cents = $centsLabel',
             style: TextStyle(
               color: textColor,
               fontSize: 12,
@@ -679,7 +682,7 @@ class _ClientPreviewCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const Text(
-            'Vista previa en Cliente',
+            'Vista previa en Cliente.',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
@@ -954,7 +957,7 @@ class _PhotoEmptyCard extends StatelessWidget {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Sube al menos una imagen para que tu servicio se vea mejor en Client.',
+                      'Sube al menos una imagen para que tu servicio se vea mejor en Cliente.',
                       style: TextStyle(
                         color: AppColors.secondaryText,
                         fontSize: 12,
@@ -1117,7 +1120,7 @@ class _ServiceImageCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      image.isMain ? 'Principal' : 'Galeria',
+                      image.isMain ? 'Principal' : 'Galería',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 11,

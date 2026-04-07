@@ -42,7 +42,7 @@ class AddProductView extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
           ),
           title: Text(
-            'Anadir ${_getCategoryLabel(category)}',
+            'Añadir ${_getCategoryLabel(category)}',
             style: const TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.bold,
@@ -58,12 +58,12 @@ class AddProductView extends StatelessWidget {
                 _ErrorBanner(message: model.generalErrorMessage!),
                 const SizedBox(height: 16),
               ],
-              _buildSectionTitle('Informacion general'),
+              _buildSectionTitle('Información general'),
               _buildDynamicForm(model),
               const SizedBox(height: 24),
-              _buildSectionTitle('Imagenes'),
+              _buildSectionTitle('Imágenes'),
               Text(
-                'Guarda primero el producto y despues podras subir su portada y galeria.',
+                'Guarda primero el producto y después podrás subir su portada y galería.',
                 style: Theme.of(
                   context,
                 ).textTheme.bodySmall?.copyWith(color: AppColors.secondaryText),
@@ -186,7 +186,7 @@ class AddProductView extends StatelessWidget {
               children: [
                 Expanded(
                   child: _buildTextField(
-                    'Cant. fotos aprox.',
+                    'Cant. de fotos aprox.',
                     '300',
                     onChanged: model.updateApproxPhotos,
                     inputKind: ProviderFieldInputKind.integer,
@@ -195,8 +195,8 @@ class AddProductView extends StatelessWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   child: _buildTextField(
-                    'Tiempo entrega',
-                    '15 dias',
+                    'Tiempo de entrega',
+                    '15 días',
                     onChanged: model.updateDeliveryTime,
                     inputKind: ProviderFieldInputKind.mixedText,
                   ),
@@ -230,13 +230,13 @@ class AddProductView extends StatelessWidget {
           ],
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Que incluye?',
+            title: '¿Qué incluye?',
             items: data.inclusions,
             onToggle: model.toggleInclusion,
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Politicas del servicio',
+            title: 'Políticas del servicio',
             items: data.policies,
             onToggle: model.togglePolicy,
           ),
@@ -246,7 +246,7 @@ class AddProductView extends StatelessWidget {
         return _buildCard([
           _buildTextField(
             'Nombre del banquete',
-            'Ej: Menu de gala 3 tiempos',
+            'Ej. Menú de gala de 3 tiempos.',
             onChanged: model.updateName,
             inputKind: ProviderFieldInputKind.title,
             errorText: model.fieldError('name'),
@@ -265,7 +265,7 @@ class AddProductView extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildTextField(
-                  'Capacidad minima',
+                  'Capacidad mínima',
                   '50',
                   onChanged: model.updateMinGuests,
                   inputKind: ProviderFieldInputKind.integer,
@@ -274,7 +274,7 @@ class AddProductView extends StatelessWidget {
               const SizedBox(width: 16),
               Expanded(
                 child: _buildTextField(
-                  'Capacidad maxima',
+                  'Capacidad máxima',
                   '300',
                   onChanged: model.updateMaxGuests,
                   inputKind: ProviderFieldInputKind.integer,
@@ -291,21 +291,21 @@ class AddProductView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _buildTextField(
-            'Menu incluido',
-            'Entrada, Plato fuerte, Postre...',
+            'Menú incluido',
+            'Entrada, plato fuerte, postre...',
             maxLines: 2,
             onChanged: model.updateMenuIncluded,
             inputKind: ProviderFieldInputKind.mixedText,
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Que incluye?',
+            title: '¿Qué incluye?',
             items: data.inclusions,
             onToggle: model.toggleInclusion,
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Politicas',
+            title: 'Políticas',
             items: data.policies,
             onToggle: model.togglePolicy,
           ),
@@ -382,7 +382,7 @@ class AddProductView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Politicas de renta',
+            title: 'Políticas de renta',
             items: data.policies,
             onToggle: model.togglePolicy,
           ),
@@ -391,7 +391,7 @@ class AddProductView extends StatelessWidget {
       case ServiceCategory.venue:
         return _buildCard([
           _buildTextField(
-            'Nombre del salon/espacio',
+            'Nombre del salón o espacio',
             'Ej: Terraza del Sol',
             onChanged: model.updateName,
             inputKind: ProviderFieldInputKind.title,
@@ -399,7 +399,7 @@ class AddProductView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _buildTextField(
-            'Capacidad maxima',
+            'Capacidad máxima',
             '200 personas',
             onChanged: model.updateVenueCapacity,
             inputKind: ProviderFieldInputKind.integer,
@@ -429,7 +429,7 @@ class AddProductView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Que incluye?',
+            title: '¿Qué incluye?',
             items: data.inclusions,
             onToggle: model.toggleInclusion,
           ),
@@ -444,8 +444,8 @@ class AddProductView extends StatelessWidget {
       case ServiceCategory.decoration:
         return _buildCard([
           _buildTextField(
-            'Nombre del paquete de decoracion',
-            'Ej: Decoracion Premium',
+            'Nombre del paquete de decoración',
+            'Ej. Decoración premium.',
             onChanged: model.updateName,
             inputKind: ProviderFieldInputKind.title,
             errorText: model.fieldError('name'),
@@ -454,7 +454,7 @@ class AddProductView extends StatelessWidget {
           _buildDropdown(
             'Tipo de evento',
             data.decorationType ?? 'Boda',
-            ['Boda', 'Cumpleanos', 'XV anos', 'Infantil'],
+            ['Boda', 'Cumpleaños', 'XV años', 'Infantil'],
             model.updateDecorationType,
           ),
           const SizedBox(height: 16),
@@ -489,7 +489,7 @@ class AddProductView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Politicas',
+            title: 'Políticas',
             items: data.policies,
             onToggle: model.togglePolicy,
           ),

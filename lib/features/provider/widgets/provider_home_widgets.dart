@@ -129,7 +129,7 @@ class ServiceItemCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Categoria: $category',
+                  'Categoría: $category',
                   style: const TextStyle(
                     color: AppColors.secondaryText,
                     fontSize: 12,

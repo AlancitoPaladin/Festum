@@ -143,7 +143,7 @@ class ManualBookingView extends StatelessWidget {
                   const SizedBox(height: 16),
                   _buildField(
                     label: 'Tipo de evento',
-                    hint: 'Ej: Boda, XV anos...',
+                    hint: 'Ej. Boda, XV años...',
                     controller: model.eventTypeController,
                     inputKind: ProviderFieldInputKind.title,
                   ),

@@ -10,7 +10,6 @@ import 'package:festum/features/provider/usecases/clear_provider_notifications_u
 import 'package:festum/features/provider/usecases/get_provider_home_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_notifications_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_product_reservations_use_case.dart';
-import 'package:festum/features/provider/usecases/mark_all_provider_notifications_as_read_use_case.dart';
 import 'package:festum/features/provider/usecases/mark_provider_notification_as_read_use_case.dart';
 import 'package:festum/features/provider/viewmodels/provider_home_viewmodel.dart';
 import 'package:festum/features/provider/views/my_services_view.dart';
@@ -71,7 +70,6 @@ class _HomeTabBody extends StatelessWidget {
         locator<GetProviderNotificationsUseCase>(),
         locator<GetProviderProductReservationsUseCase>(),
         locator<MarkProviderNotificationAsReadUseCase>(),
-        locator<MarkAllProviderNotificationsAsReadUseCase>(),
         locator<ClearProviderNotificationsUseCase>(),
         locator<ProviderReactivityService>(),
       ),
@@ -277,11 +275,6 @@ class _HomeTabBody extends StatelessWidget {
                                   onPressed: () => model.clearAll(),
                                   child: const Text('Borrar todo'),
                                 ),
-                              if (model.unreadCount > 0)
-                                TextButton(
-                                  onPressed: () => model.markAllAsRead(),
-                                  child: const Text('Marcar todo'),
-                                ),
                               TextButton(
                                 onPressed: () =>
                                     Navigator.of(sheetContext).pop(),
@@ -453,7 +446,7 @@ class _EmptyNotificationsState extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             const Text(
-              'Cuando lleguen avisos nuevos del sistema o de tus reservas apareceran aqui.',
+              'Cuando lleguen avisos nuevos del sistema o de tus reservas, aparecerán aquí.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,

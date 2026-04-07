@@ -18,6 +18,10 @@ import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 
 class EditServiceViewModel extends BaseViewModel {
+  static const int _uploadImageQuality = 70;
+  static const double _uploadMaxWidth = 1600;
+  static const double _uploadMaxHeight = 1600;
+
   EditServiceViewModel({
     required this.serviceId,
     required this.serviceName,
@@ -80,8 +84,10 @@ class EditServiceViewModel extends BaseViewModel {
   bool _isUploadingImage = false;
   String? _mutatingImageKey;
   String _initialFingerprint = '';
+  String _initialContentFingerprint = '';
   String _currentStatus = 'draft';
-  bool _isUpdatingStatus = false;
+  String _initialStatus = 'draft';
+  final bool _isUpdatingStatus = false;
 
   ServiceFormData get formData => _formData;
   ServiceCategory? get selectedCategory => _formData.category;
@@ -137,7 +143,7 @@ class EditServiceViewModel extends BaseViewModel {
 
   String get previewSubtitle {
     final String value = _formData.subtitle.trim();
-    return value.isEmpty ? 'Sin descripcion breve' : value;
+    return value.isEmpty ? 'Sin descripción breve.' : value;
   }
 
   String get previewBadge {
@@ -158,9 +164,9 @@ class EditServiceViewModel extends BaseViewModel {
       case ServiceCategory.banquet:
         return 'Catering';
       case ServiceCategory.dj:
-        return 'Musica';
+        return 'Música';
       case ServiceCategory.decoration:
-        return 'Decoracion';
+        return 'Decoración';
       case ServiceCategory.photography:
         return 'Foto y video';
       case ServiceCategory.entertainment:
@@ -208,6 +214,8 @@ class EditServiceViewModel extends BaseViewModel {
         _applyService(service);
       }
       _hasLoadedInitialData = true;
+      _initialStatus = _currentStatus;
+      _initialContentFingerprint = _contentFingerprint();
       _initialFingerprint = _currentFingerprint();
     } catch (error) {
       _generalErrorMessage = ProviderServicesRepository.mapApiError(
@@ -305,10 +313,33 @@ class EditServiceViewModel extends BaseViewModel {
 
     setBusy(true);
     try {
-      await _updateProviderServiceUseCase(
-        serviceId: serviceId,
-        request: ProviderServiceUpsertRequest.fromForm(_formData),
-      );
+      final bool hasContentChanges =
+          _contentFingerprint() != _initialContentFingerprint;
+      final bool hasStatusChanges = _currentStatus != _initialStatus;
+
+      ProviderService? updated;
+      if (hasContentChanges) {
+        final ProviderServiceUpsertRequest request =
+            ProviderServiceUpsertRequest.fromForm(_formData);
+        updated = await _updateProviderServiceUseCase(
+          serviceId: serviceId,
+          request: request,
+        );
+      }
+      if (hasStatusChanges) {
+        updated = await _updateProviderServiceStatusUseCase(
+          serviceId: serviceId,
+          status: _currentStatus,
+        );
+      }
+
+      if (updated == null) {
+        return true;
+      }
+
+      _applyService(updated);
+      _initialStatus = _currentStatus;
+      _initialContentFingerprint = _contentFingerprint();
       _initialFingerprint = _currentFingerprint();
       await _providerReactivityService.notifyServicesChanged();
       return true;
@@ -341,25 +372,9 @@ class EditServiceViewModel extends BaseViewModel {
       }
     }
 
-    try {
-      _isUpdatingStatus = true;
-      notifyListeners();
-      final ProviderService updated = await _updateProviderServiceStatusUseCase(
-        serviceId: serviceId,
-        status: targetStatus,
-      );
-      _currentStatus = updated.normalizedStatus;
-      await _providerReactivityService.notifyServicesChanged();
-      return null;
-    } catch (error) {
-      return ProviderServicesRepository.mapApiError(
-        error,
-        fallbackMessage: 'No se pudo actualizar el estado del servicio.',
-      );
-    } finally {
-      _isUpdatingStatus = false;
-      notifyListeners();
-    }
+    _currentStatus = targetStatus;
+    notifyListeners();
+    return null;
   }
 
   Future<String?> uploadImage() async {
@@ -371,7 +386,9 @@ class EditServiceViewModel extends BaseViewModel {
     try {
       final XFile? selectedFile = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 85,
+        imageQuality: _uploadImageQuality,
+        maxWidth: _uploadMaxWidth,
+        maxHeight: _uploadMaxHeight,
       );
       if (selectedFile == null) {
         return null;
@@ -549,8 +566,8 @@ class EditServiceViewModel extends BaseViewModel {
     _currentStatus = service.normalizedStatus;
     if (service.hasUnknownCategory) {
       _generalErrorMessage =
-          'Este servicio usa una categoria no soportada por esta version. Selecciona una categoria valida para poder guardar cambios.';
-      _fieldErrors['category'] = 'Selecciona una categoria valida.';
+          'Este servicio usa una categoría no soportada por esta versión. Selecciona una categoría válida para poder guardar cambios.';
+      _fieldErrors['category'] = 'Selecciona una categoría válida.';
     }
   }
 
@@ -565,13 +582,13 @@ class EditServiceViewModel extends BaseViewModel {
 
   bool _validate() {
     if (_formData.category == null) {
-      _fieldErrors['category'] = 'Selecciona una categoria.';
+      _fieldErrors['category'] = 'Selecciona una categoría.';
     }
     if (_formData.name.trim().isEmpty) {
       _fieldErrors['name'] = 'El nombre es obligatorio.';
     }
     if (_formData.subtitle.trim().isEmpty) {
-      _fieldErrors['subtitle'] = 'El subtitulo es obligatorio.';
+      _fieldErrors['subtitle'] = 'El subtítulo es obligatorio.';
     }
     if (_formData.unitPriceCents <= 0) {
       _fieldErrors['unit_price_cents'] =
@@ -640,6 +657,13 @@ class EditServiceViewModel extends BaseViewModel {
   }
 
   String _currentFingerprint() {
+    return <String>[
+      _currentStatus,
+      _contentFingerprint(),
+    ].join('::');
+  }
+
+  String _contentFingerprint() {
     return <String>[
       (_formData.category?.providerApiValue ?? '').trim(),
       _formData.name.trim(),

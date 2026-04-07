@@ -9,6 +9,7 @@ import 'package:festum/features/provider/models/provider_tab.dart';
 import 'package:festum/features/provider/models/service_category.dart';
 import 'package:festum/features/provider/usecases/delete_provider_service_product_use_case.dart';
 import 'package:festum/features/provider/usecases/get_provider_service_products_use_case.dart';
+import 'package:festum/features/provider/usecases/get_provider_services_use_case.dart';
 import 'package:festum/features/provider/viewmodels/manage_service_viewmodel.dart';
 import 'package:festum/features/provider/widgets/provider_bottom_nav_bar.dart';
 import 'package:flutter/material.dart';
@@ -34,6 +35,7 @@ class ManageServiceView extends StatelessWidget {
         serviceId: serviceId,
         serviceName: serviceName,
         category: category,
+        getProviderServicesUseCase: locator<GetProviderServicesUseCase>(),
         getProviderServiceProductsUseCase:
             locator<GetProviderServiceProductsUseCase>(),
         deleteProviderServiceProductUseCase:
@@ -46,12 +48,6 @@ class ManageServiceView extends StatelessWidget {
         appBar: CustomAppBar(
           title: serviceName,
           showBackButton: true,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.more_vert, color: AppColors.primaryText),
-              onPressed: () {},
-            ),
-          ],
         ),
         body: Stack(
           children: [
@@ -60,12 +56,28 @@ class ManageServiceView extends StatelessWidget {
               children: [
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Text(
-                    'Administra los productos de este servicio',
-                    style: TextStyle(
-                      color: AppColors.secondaryText,
-                      fontSize: 14,
-                    ),
+                  child: SizedBox.shrink(),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          'Administra los productos de este servicio.',
+                          style: const TextStyle(
+                            color: AppColors.secondaryText,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      _ServiceStatusChip(
+                        statusLabel: model.statusLabel,
+                        isPublished: model.isPublished,
+                        isInactive: model.isInactive,
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -142,6 +154,15 @@ class ManageServiceView extends StatelessWidget {
     ManageServiceViewModel model,
     int index,
   ) async {
+    final ProviderProduct product = model.products[index];
+    final bool confirmed = await _confirmDeleteProduct(
+      context,
+      product: product,
+    );
+    if (!confirmed || !context.mounted) {
+      return;
+    }
+
     final String? errorMessage = await model.deleteProduct(index);
     if (!context.mounted) {
       return;
@@ -157,6 +178,34 @@ class ManageServiceView extends StatelessWidget {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Producto eliminado.')));
+  }
+
+  Future<bool> _confirmDeleteProduct(
+    BuildContext context, {
+    required ProviderProduct product,
+  }) async {
+    final bool? result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Eliminar producto'),
+          content: Text(
+            '¿Quieres eliminar "${product.name}"? Esta acción no se puede deshacer.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
   }
 }
 
@@ -279,7 +328,7 @@ class _AddProductButton extends StatelessWidget {
             Icon(Icons.add, color: AppColors.primaryText),
             SizedBox(width: 8),
             Text(
-              'Anadir producto',
+              'Añadir producto',
               style: TextStyle(
                 color: AppColors.primaryText,
                 fontWeight: FontWeight.w500,
@@ -375,7 +424,7 @@ class _ProductCard extends StatelessWidget {
                 Text(
                   product.description.trim().isNotEmpty
                       ? product.description
-                      : 'Sin descripcion disponible.',
+                      : 'Sin descripción disponible.',
                   style: const TextStyle(
                     color: AppColors.secondaryText,
                     fontSize: 13,
@@ -423,6 +472,41 @@ class _ProductCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ServiceStatusChip extends StatelessWidget {
+  const _ServiceStatusChip({
+    required this.statusLabel,
+    required this.isPublished,
+    required this.isInactive,
+  });
+
+  final String statusLabel;
+  final bool isPublished;
+  final bool isInactive;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color color = isPublished
+        ? Colors.green
+        : (isInactive ? Colors.red : Colors.orange);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        statusLabel,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

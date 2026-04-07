@@ -169,7 +169,7 @@ class AddProductViewModel extends BaseViewModel {
           'Dron': false,
           'Album impreso': false,
           'Edicion profesional': false,
-          'Galeria online': false,
+          'Galería en línea': false,
         };
         break;
       case ServiceCategory.venue:

@@ -71,103 +71,131 @@ class EditProductView extends StatelessWidget {
 
         final ServiceCategory category = model.category ?? ServiceCategory.dj;
 
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: AppColors.primaryText),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: Text(
-              'Editar ${_getCategoryLabel(category)}',
-              style: const TextStyle(
-                color: AppColors.primaryText,
-                fontWeight: FontWeight.bold,
+        return PopScope(
+          canPop: !model.hasPendingChanges,
+          onPopInvokedWithResult: (bool didPop, Object? result) async {
+            if (didPop) {
+              return;
+            }
+            final bool allowExit = await _handleExit(context, model);
+            if (!context.mounted || !allowExit) {
+              return;
+            }
+            Navigator.of(context).pop();
+          },
+          child: Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: AppColors.primaryText),
+                onPressed: () async {
+                  final bool allowExit = await _handleExit(context, model);
+                  if (!context.mounted || !allowExit) {
+                    return;
+                  }
+                  Navigator.of(context).pop();
+                },
+              ),
+              title: Text(
+                'Editar ${_getCategoryLabel(category)}',
+                style: const TextStyle(
+                  color: AppColors.primaryText,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (model.generalErrorMessage != null) ...[
-                  _ErrorBanner(message: model.generalErrorMessage!),
-                  const SizedBox(height: 16),
-                ],
-                _StatusHeader(product: model.product),
-                const SizedBox(height: 16),
-                _buildSectionTitle('Informacion general'),
-                _buildDynamicForm(model, category),
-                const SizedBox(height: 24),
-                _buildSectionTitle('Imagenes'),
-                _ProductImagesSection(
-                  model: model,
-                  onAddImage: () => _runImageAction(
-                    context,
-                    model.uploadImage,
-                    successMessage: 'Imagen subida.',
-                  ),
-                  onMarkAsMain: (String imageKey) => _runImageAction(
-                    context,
-                    () => model.markImageAsMain(imageKey),
-                    successMessage: 'Imagen principal actualizada.',
-                  ),
-                  onDeleteImage: (String imageKey) => _runImageAction(
-                    context,
-                    () => model.deleteImage(imageKey),
-                    successMessage: 'Imagen eliminada.',
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _buildSectionTitle('Descripción'),
-                _buildTextField(
-                  '',
-                  'Describe lo que ofreces...',
-                  initialValue: model.formData.description,
-                  maxLines: 3,
-                  onChanged: model.updateDescription,
-                  inputKind: ProviderFieldInputKind.mixedText,
-                ),
-                const SizedBox(height: 24),
-                _buildSectionTitle('Estado del producto'),
-                _StatusActions(
-                  model: model,
-                  onPublish: () => _changeStatus(
-                    context,
-                    model.publish,
-                    successMessage: 'Producto publicado.',
-                  ),
-                  onInactivate: () => _changeStatus(
-                    context,
-                    model.inactivate,
-                    successMessage: 'Producto inactivado.',
-                  ),
-                ),
-                const SizedBox(height: 40),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildButton(
-                        'Cancelar',
-                        isSecondary: true,
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildButton(
-                        'Guardar cambios',
-                        onPressed: () => _saveChanges(context, model),
-                        isLoading: model.isBusy,
-                      ),
-                    ),
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (model.generalErrorMessage != null) ...[
+                    _ErrorBanner(message: model.generalErrorMessage!),
+                    const SizedBox(height: 16),
                   ],
-                ),
-                const SizedBox(height: 40),
-              ],
+                  _StatusHeader(model: model),
+                  const SizedBox(height: 16),
+                  _buildSectionTitle('Información general'),
+                  _buildDynamicForm(model, category),
+                  const SizedBox(height: 24),
+                  _buildSectionTitle('Imágenes'),
+                  _ProductImagesSection(
+                    model: model,
+                    onAddImage: () => _runImageAction(
+                      context,
+                      model.uploadImage,
+                      successMessage: 'Imagen subida.',
+                    ),
+                    onMarkAsMain: (String imageKey) => _runImageAction(
+                      context,
+                      () => model.markImageAsMain(imageKey),
+                      successMessage: 'Imagen principal actualizada.',
+                    ),
+                    onDeleteImage: (String imageKey) => _runImageAction(
+                      context,
+                      () => model.deleteImage(imageKey),
+                      successMessage: 'Imagen eliminada.',
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionTitle('Descripción'),
+                  _buildTextField(
+                    '',
+                    'Describe lo que ofreces...',
+                    initialValue: model.formData.description,
+                    maxLines: 3,
+                    onChanged: model.updateDescription,
+                    inputKind: ProviderFieldInputKind.mixedText,
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionTitle('Estado del producto'),
+                  _StatusActions(
+                    model: model,
+                    onPublish: () => _changeStatus(
+                      context,
+                      model.publish,
+                      successMessage: 'Estado listo. Guarda cambios para aplicarlo.',
+                    ),
+                    onInactivate: () => _changeStatus(
+                      context,
+                      model.inactivate,
+                      successMessage: 'Estado listo. Guarda cambios para aplicarlo.',
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildButton(
+                          'Cancelar',
+                          isSecondary: true,
+                          onPressed: () async {
+                            final bool allowExit = await _handleExit(
+                              context,
+                              model,
+                            );
+                            if (!context.mounted || !allowExit) {
+                              return;
+                            }
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildButton(
+                          'Guardar cambios',
+                          onPressed: () => _saveChanges(context, model),
+                          isLoading: model.isBusy,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
             ),
           ),
         );
@@ -185,6 +213,39 @@ class EditProductView extends StatelessWidget {
     }
 
     Navigator.pop(context, true);
+  }
+
+  Future<bool> _handleExit(
+    BuildContext context,
+    EditProductViewModel model,
+  ) async {
+    if (!model.hasPendingChanges) {
+      return true;
+    }
+
+    final bool? shouldDiscard = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Salir sin guardar'),
+          content: const Text(
+            'Hay cambios sin guardar. ¿Quieres salir y descartarlos?',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Descartar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return shouldDiscard ?? false;
   }
 
   Future<void> _changeStatus(
@@ -290,7 +351,7 @@ class EditProductView extends StatelessWidget {
               children: [
                 Expanded(
                   child: _buildTextField(
-                    'Cant. fotos aprox.',
+                    'Cant. de fotos aprox.',
                     '300',
                     initialValue: data.approxPhotos?.toString(),
                     onChanged: model.updateApproxPhotos,
@@ -300,7 +361,7 @@ class EditProductView extends StatelessWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   child: _buildTextField(
-                    'Tiempo entrega',
+                    'Tiempo de entrega',
                     '15 dias',
                     initialValue: data.deliveryTime,
                     onChanged: model.updateDeliveryTime,
@@ -338,13 +399,13 @@ class EditProductView extends StatelessWidget {
           ],
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Que incluye?',
+            title: '¿Qué incluye?',
             items: data.inclusions,
             onToggle: model.toggleInclusion,
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Politicas',
+            title: 'Políticas',
             items: data.policies,
             onToggle: model.togglePolicy,
           ),
@@ -374,7 +435,7 @@ class EditProductView extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildTextField(
-                  'Minimo invitados',
+                  'Mínimo de invitados',
                   '50',
                   initialValue: data.minGuests?.toString(),
                   onChanged: model.updateMinGuests,
@@ -384,7 +445,7 @@ class EditProductView extends StatelessWidget {
               const SizedBox(width: 16),
               Expanded(
                 child: _buildTextField(
-                  'Maximo invitados',
+                  'Máximo de invitados',
                   '300',
                   initialValue: data.maxGuests?.toString(),
                   onChanged: model.updateMaxGuests,
@@ -411,13 +472,13 @@ class EditProductView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Que incluye?',
+            title: '¿Qué incluye?',
             items: data.inclusions,
             onToggle: model.toggleInclusion,
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Politicas',
+            title: 'Políticas',
             items: data.policies,
             onToggle: model.togglePolicy,
           ),
@@ -425,7 +486,7 @@ class EditProductView extends StatelessWidget {
       case ServiceCategory.venue:
         return _buildCard([
           _buildTextField(
-            'Nombre del salon',
+            'Nombre del salón',
             'Salon Imperial',
             initialValue: data.name,
             onChanged: model.updateName,
@@ -466,13 +527,13 @@ class EditProductView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Que incluye?',
+            title: '¿Qué incluye?',
             items: data.inclusions,
             onToggle: model.toggleInclusion,
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Politicas',
+            title: 'Políticas',
             items: data.policies,
             onToggle: model.togglePolicy,
           ),
@@ -481,7 +542,7 @@ class EditProductView extends StatelessWidget {
         return _buildCard([
           _buildTextField(
             'Nombre del paquete',
-            'Decoracion Floral',
+            'Decoración floral',
             initialValue: data.name,
             onChanged: model.updateName,
             inputKind: ProviderFieldInputKind.title,
@@ -491,7 +552,7 @@ class EditProductView extends StatelessWidget {
           _buildDropdown(
             'Tipo de evento',
             data.decorationType ?? 'Boda',
-            ['Boda', 'Cumpleanos', 'XV anos', 'Infantil'],
+            ['Boda', 'Cumpleaños', 'XV años', 'Infantil'],
             model.updateDecorationType,
           ),
           const SizedBox(height: 16),
@@ -528,7 +589,7 @@ class EditProductView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Politicas',
+            title: 'Políticas',
             items: data.policies,
             onToggle: model.togglePolicy,
           ),
@@ -610,7 +671,7 @@ class EditProductView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           DynamicSelectionList(
-            title: 'Politicas',
+            title: 'Políticas',
             items: data.policies,
             onToggle: model.togglePolicy,
           ),
@@ -810,17 +871,18 @@ class EditProductView extends StatelessWidget {
 }
 
 class _StatusHeader extends StatelessWidget {
-  const _StatusHeader({required this.product});
+  const _StatusHeader({required this.model});
 
-  final ProviderProduct? product;
+  final EditProductViewModel model;
 
   @override
   Widget build(BuildContext context) {
+    final ProviderProduct? product = model.product;
     if (product == null) {
       return const SizedBox.shrink();
     }
 
-    final (String label, Color color) = _resolveStatus(product!);
+    final (String label, Color color) = _resolveStatus(model);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -845,7 +907,7 @@ class _StatusHeader extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              product!.priceLabel,
+              product.priceLabel,
               style: const TextStyle(
                 color: AppColors.secondaryText,
                 fontSize: 13,
@@ -857,11 +919,11 @@ class _StatusHeader extends StatelessWidget {
     );
   }
 
-  (String, Color) _resolveStatus(ProviderProduct product) {
-    if (product.isPublished) {
+  (String, Color) _resolveStatus(EditProductViewModel model) {
+    if (model.isPublished) {
       return ('Publicado', Colors.green);
     }
-    if (product.isInactive) {
+    if (model.isInactive) {
       return ('Inactivo', Colors.red);
     }
     return ('Borrador', Colors.orange);
@@ -946,7 +1008,7 @@ class _PhotoEmptyCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Sube una imagen principal para que el producto se vea en Client cuando esté publicado.',
+            'Sube una imagen principal para que el producto se vea en Cliente cuando esté publicado.',
             style: TextStyle(color: AppColors.secondaryText, height: 1.35),
           ),
           const SizedBox(height: 16),
@@ -1086,7 +1148,7 @@ class _ProductImageCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      image.isMain ? 'Principal' : 'Galeria',
+                      image.isMain ? 'Principal' : 'Galería',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 11,
@@ -1143,12 +1205,11 @@ class _StatusActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ProviderProduct? product = model.product;
-    if (product == null) {
+    if (model.product == null) {
       return const SizedBox.shrink();
     }
 
-    if (product.isPublished) {
+    if (model.isPublished) {
       return SizedBox(
         width: double.infinity,
         child: OutlinedButton(

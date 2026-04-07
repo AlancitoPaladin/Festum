@@ -167,6 +167,15 @@ class MyServicesView extends StatelessWidget {
     MyServicesViewModel model,
     int index,
   ) async {
+    final ProviderService service = model.services[index];
+    final bool confirmed = await _confirmDeleteService(
+      context,
+      service: service,
+    );
+    if (!confirmed || !context.mounted) {
+      return;
+    }
+
     final String? errorMessage = await model.deleteService(index);
     if (!context.mounted) {
       return;
@@ -182,6 +191,34 @@ class MyServicesView extends StatelessWidget {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Servicio eliminado.')));
+  }
+
+  Future<bool> _confirmDeleteService(
+    BuildContext context, {
+    required ProviderService service,
+  }) async {
+    final bool? result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Eliminar servicio'),
+          content: Text(
+            '¿Quieres eliminar "${service.name}"? Esta acción no se puede deshacer.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
   }
 
   Future<bool> _confirmStatusChange(
@@ -289,7 +326,7 @@ class _EmptyMyServicesState extends StatelessWidget {
               ),
               SizedBox(height: 8),
               Text(
-                'Crea uno como draft, revísalo y publícalo cuando ya quieras mostrarlo en Client.',
+                'Crea uno como borrador, revísalo y publícalo cuando ya quieras mostrarlo en Cliente.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.secondaryText, height: 1.4),
               ),
@@ -324,7 +361,7 @@ class _AddServiceButton extends StatelessWidget {
             Icon(Icons.add, color: AppColors.secondaryText),
             SizedBox(width: 8),
             Text(
-              'Anadir nuevo servicio',
+              'Añadir nuevo servicio',
               style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w500,
@@ -431,23 +468,13 @@ class _ServiceCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                PopupMenuButton<String>(
-                  enabled: !isMutating,
+                IconButton(
+                  onPressed: isMutating ? null : onDelete,
                   icon: const Icon(
-                    Icons.more_vert,
-                    color: AppColors.secondaryText,
+                    Icons.delete_outline,
+                    color: AppColors.alert,
                   ),
-                  itemBuilder: (context) => const <PopupMenuEntry<String>>[
-                    PopupMenuItem<String>(
-                      value: 'delete',
-                      child: Text('Eliminar'),
-                    ),
-                  ],
-                  onSelected: (String value) {
-                    if (value == 'delete') {
-                      onDelete();
-                    }
-                  },
+                  tooltip: 'Eliminar servicio',
                 ),
               ],
             ),
@@ -661,11 +688,11 @@ class _StatusPresentation {
 
   factory _StatusPresentation.from(ProviderService service) {
     if (service.isPublished) {
-      return const _StatusPresentation(label: 'Published', color: Colors.green);
+      return const _StatusPresentation(label: 'Publicado', color: Colors.green);
     }
     if (service.isInactive) {
-      return const _StatusPresentation(label: 'Inactive', color: Colors.red);
+      return const _StatusPresentation(label: 'Inactivo', color: Colors.red);
     }
-    return const _StatusPresentation(label: 'Draft', color: Colors.orange);
+    return const _StatusPresentation(label: 'Borrador', color: Colors.orange);
   }
 }

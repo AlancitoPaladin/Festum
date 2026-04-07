@@ -92,6 +92,12 @@ class ProviderServicesRepository {
     String fallbackMessage = 'No se pudo guardar el servicio.',
   }) {
     if (error is DioException) {
+      if (error.response?.statusCode == 413) {
+        return const ProviderRequestError(
+          message: 'La imagen es demasiado pesada. Intenta con una foto mas ligera.',
+        );
+      }
+
       final dynamic data = error.response?.data;
       if (data is Map<String, dynamic>) {
         final Map<String, String> fieldErrors = _extractFieldErrors(data);
@@ -100,6 +106,38 @@ class ProviderServicesRepository {
           fallbackMessage: fallbackMessage,
         );
         return ProviderRequestError(message: message, fieldErrors: fieldErrors);
+      }
+
+      if (data is Map) {
+        final Map<String, dynamic> normalized = Map<String, dynamic>.from(data);
+        final Map<String, String> fieldErrors = _extractFieldErrors(normalized);
+        final String message = _extractMessage(
+          normalized,
+          fallbackMessage: fallbackMessage,
+        );
+        return ProviderRequestError(message: message, fieldErrors: fieldErrors);
+      }
+
+      if (data is String && data.trim().isNotEmpty) {
+        return ProviderRequestError(
+          message: _extractStringMessage(
+            data,
+            fallbackMessage: fallbackMessage,
+            statusCode: error.response?.statusCode,
+          ),
+        );
+      }
+
+      final int? statusCode = error.response?.statusCode;
+      if (statusCode != null) {
+        return ProviderRequestError(
+          message: '$fallbackMessage (HTTP $statusCode)',
+        );
+      }
+
+      final String rawMessage = error.message?.trim() ?? '';
+      if (rawMessage.isNotEmpty) {
+        return ProviderRequestError(message: rawMessage);
       }
 
       return ProviderRequestError(message: fallbackMessage);
@@ -189,5 +227,26 @@ class ProviderServicesRepository {
     }
 
     return errors;
+  }
+
+  static String _extractStringMessage(
+    String data, {
+    required String fallbackMessage,
+    required int? statusCode,
+  }) {
+    final String trimmed = data.trim();
+    if (trimmed.isEmpty) {
+      return statusCode == null
+          ? fallbackMessage
+          : '$fallbackMessage (HTTP $statusCode)';
+    }
+
+    if (!trimmed.startsWith('<')) {
+      return trimmed;
+    }
+
+    return statusCode == null
+        ? fallbackMessage
+        : '$fallbackMessage (HTTP $statusCode)';
   }
 }

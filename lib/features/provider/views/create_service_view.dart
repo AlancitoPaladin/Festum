@@ -162,7 +162,7 @@ class CreateServiceView extends StatelessWidget {
                   _PricePreviewCard(cents: model.formData.unitPriceCents),
                   const SizedBox(height: 10),
                   const _InfoCard(
-                    title: 'Como se muestra en Cliente',
+                    title: 'Cómo se muestra en Cliente.',
                     subtitle:
                         'Este precio funciona como referencia inicial. Cuando existan productos publicados, el backend puede calcular el precio final mostrado al cliente.',
                   ),
@@ -195,7 +195,7 @@ class CreateServiceView extends StatelessWidget {
                   const _PhotoPlaceholderCard(
                     title: 'Sube fotos despues de guardar',
                     subtitle:
-                        'En cuanto se cree el servicio te llevaremos a la pantalla de edicion para agregar imagenes.',
+                        'En cuanto se cree el servicio, te llevaremos a la pantalla de edición para agregar imágenes.',
                   ),
                   const SizedBox(height: 48),
                   SizedBox(
@@ -273,7 +273,7 @@ class CreateServiceView extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Servicio guardado en draft. Publicalo desde Mis servicios para verlo en Cliente.',
+            'Servicio guardado en borrador. Publícalo desde Mis servicios para verlo en Cliente.',
           ),
         ),
       );
@@ -326,12 +326,12 @@ class CreateServiceView extends StatelessWidget {
         return AlertDialog(
           title: const Text('Publicar servicio'),
           content: const Text(
-            'Quieres publicarlo ahora para que pueda mostrarse en Cliente?',
+            '¿Quieres publicarlo ahora para que pueda mostrarse en Cliente?',
           ),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Dejar draft'),
+              child: const Text('Dejar en borrador'),
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
@@ -357,7 +357,7 @@ class CreateServiceView extends StatelessWidget {
         return AlertDialog(
           title: const Text('Salir sin guardar'),
           content: const Text(
-            'Hay cambios sin guardar. Quieres salir y descartarlos?',
+            'Hay cambios sin guardar. ¿Quieres salir y descartarlos?',
           ),
           actions: <Widget>[
             TextButton(
@@ -438,14 +438,14 @@ class CreateServiceView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const Text(
-            'Categoria',
+            'Categoría',
             style: TextStyle(color: AppColors.secondaryText, fontSize: 13),
           ),
           DropdownButtonHideUnderline(
             child: DropdownButton<ServiceCategory>(
               value: model.selectedCategory,
               hint: const Text(
-                'Selecciona una categoria',
+                'Selecciona una categoría',
                 style: TextStyle(color: Colors.black26, fontSize: 14),
               ),
               isExpanded: true,
@@ -521,7 +521,7 @@ class _PricePreviewCard extends StatelessWidget {
             const SizedBox(height: 4),
           ],
           Text(
-            'Se enviara: unit_price_cents = $centsLabel',
+            'Se enviará: unit_price_cents = $centsLabel',
             style: TextStyle(
               color: textColor,
               fontSize: 12,
@@ -568,7 +568,7 @@ class _ClientPreviewCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const Text(
-            'Vista previa en Cliente',
+            'Vista previa en Cliente.',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,

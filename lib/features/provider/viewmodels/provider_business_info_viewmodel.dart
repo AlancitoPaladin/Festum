@@ -15,6 +15,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:stacked/stacked.dart';
 
 class ProviderBusinessInfoViewModel extends BaseViewModel {
+  static const int _uploadImageQuality = 70;
+  static const double _logoMaxWidth = 1200;
+  static const double _logoMaxHeight = 1200;
+  static const double _photoMaxWidth = 1600;
+  static const double _photoMaxHeight = 1600;
+
   ProviderBusinessInfoViewModel(
     this._getProviderBusinessProfileUseCase,
     this._saveProviderBusinessProfileUseCase,
@@ -45,12 +51,14 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
   final TextEditingController websiteController = TextEditingController();
 
   final BusinessInfo _businessInfo = BusinessInfo();
+  final Set<String> _pendingPhotoPaths = <String>{};
 
   String? _errorMessage;
   bool _isUploadingAsset = false;
   bool _hasExistingProfile = false;
   bool _hasLoadedProfile = false;
   bool _didRefreshAfterAsset403 = false;
+  String? _pendingLogoPath;
 
   BusinessInfo get businessInfo => _businessInfo;
   bool get isOnboardingRequired =>
@@ -142,6 +150,11 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
   Future<String?> saveProfile() async {
     setBusy(true);
     try {
+      final String? uploadError = await _uploadPendingAssets();
+      if (uploadError != null) {
+        return uploadError;
+      }
+
       final ProviderBusinessProfile response =
           await _saveProviderBusinessProfileUseCase(_toProfile());
       _applyProfile(response);
@@ -162,55 +175,46 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
   }
 
   Future<String?> pickLogo() async {
-    final String? previousLogoUrl = _businessInfo.logoUrl;
-    return _uploadAsset(
-      pickerAction: () =>
-          _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 85),
-      uploadAction: _uploadProviderBusinessLogoUseCase.call,
-      onPreviewSelected: (String previewUrl) {
-        _businessInfo.logoUrl = previewUrl;
-        _providerBrandingService.sync(
-          businessName: _businessInfo.name,
-          logoUrl: previewUrl,
-        );
-      },
-      onUploaded: (String previewUrl, String assetUrl) {
-        _businessInfo.logoUrl = assetUrl;
-      },
-      onUploadFailed: (String previewUrl) {
-        _businessInfo.logoUrl = previousLogoUrl;
-        _providerBrandingService.sync(
-          businessName: _businessInfo.name,
-          logoUrl: previousLogoUrl ?? '',
-        );
-      },
-    );
+    try {
+      final XFile? selectedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: _uploadImageQuality,
+        maxWidth: _logoMaxWidth,
+        maxHeight: _logoMaxHeight,
+      );
+      if (selectedFile == null) {
+        return null;
+      }
+
+      _pendingLogoPath = selectedFile.path;
+      _businessInfo.logoUrl = selectedFile.path;
+      notifyListeners();
+      return null;
+    } catch (error) {
+      return ProviderBusinessRepository.mapApiError(error);
+    }
   }
 
   Future<String?> addPhoto() async {
-    return _uploadAsset(
-      pickerAction: () =>
-          _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 85),
-      uploadAction: _uploadProviderBusinessPhotoUseCase.call,
-      onPreviewSelected: (String previewUrl) {
-        _businessInfo.photoUrls = List<String>.from(_businessInfo.photoUrls)
-          ..add(previewUrl);
-      },
-      onUploaded: (String previewUrl, String assetUrl) {
-        final List<String> updatedUrls = List<String>.from(_businessInfo.photoUrls);
-        final int previewIndex = updatedUrls.indexOf(previewUrl);
-        if (previewIndex >= 0) {
-          updatedUrls[previewIndex] = assetUrl;
-        } else {
-          updatedUrls.add(assetUrl);
-        }
-        _businessInfo.photoUrls = updatedUrls;
-      },
-      onUploadFailed: (String previewUrl) {
-        _businessInfo.photoUrls = List<String>.from(_businessInfo.photoUrls)
-          ..remove(previewUrl);
-      },
-    );
+    try {
+      final XFile? selectedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: _uploadImageQuality,
+        maxWidth: _photoMaxWidth,
+        maxHeight: _photoMaxHeight,
+      );
+      if (selectedFile == null) {
+        return null;
+      }
+
+      _pendingPhotoPaths.add(selectedFile.path);
+      _businessInfo.photoUrls = List<String>.from(_businessInfo.photoUrls)
+        ..add(selectedFile.path);
+      notifyListeners();
+      return null;
+    } catch (error) {
+      return ProviderBusinessRepository.mapApiError(error);
+    }
   }
 
   Future<void> retryLoad() async {
@@ -238,51 +242,48 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
     super.dispose();
   }
 
-  Future<String?> _uploadAsset({
-    required Future<XFile?> Function() pickerAction,
-    required Future<ProviderAssetUploadResponse> Function(String filePath)
-    uploadAction,
-    required void Function(String previewUrl) onPreviewSelected,
-    required void Function(String previewUrl, String assetUrl) onUploaded,
-    required void Function(String previewUrl) onUploadFailed,
-  }) async {
+  Future<String?> _uploadPendingAssets() async {
     if (_isUploadingAsset) {
       return null;
     }
 
-    String? previewUrl;
+    _isUploadingAsset = true;
+    notifyListeners();
+
     try {
-      final XFile? selectedFile = await pickerAction();
-      if (selectedFile == null) {
-        return null;
+      if (_pendingLogoPath != null && _pendingLogoPath!.trim().isNotEmpty) {
+        final ProviderAssetUploadResponse response =
+            await _uploadProviderBusinessLogoUseCase(_pendingLogoPath!);
+        final String assetUrl = response.assetUrl.trim();
+        if (assetUrl.isEmpty) {
+          return 'La API no devolvio una URL valida para el archivo.';
+        }
+        _businessInfo.logoUrl = assetUrl;
+        _pendingLogoPath = null;
       }
 
-      previewUrl = selectedFile.path;
-      onPreviewSelected(previewUrl);
-      _isUploadingAsset = true;
-      notifyListeners();
+      if (_pendingPhotoPaths.isNotEmpty) {
+        final List<String> updatedUrls = List<String>.from(_businessInfo.photoUrls);
+        for (int index = 0; index < updatedUrls.length; index++) {
+          final String currentUrl = updatedUrls[index];
+          if (!_pendingPhotoPaths.contains(currentUrl)) {
+            continue;
+          }
 
-      final ProviderAssetUploadResponse response = await uploadAction(
-        selectedFile.path,
-      );
-      final String assetUrl = response.assetUrl.trim();
-
-      if (assetUrl.isEmpty) {
-        onUploadFailed(previewUrl);
-        return 'La API no devolvio una URL valida para el archivo.';
+          final ProviderAssetUploadResponse response =
+              await _uploadProviderBusinessPhotoUseCase(currentUrl);
+          final String assetUrl = response.assetUrl.trim();
+          if (assetUrl.isEmpty) {
+            return 'La API no devolvio una URL valida para el archivo.';
+          }
+          updatedUrls[index] = assetUrl;
+        }
+        _businessInfo.photoUrls = updatedUrls;
+        _pendingPhotoPaths.clear();
       }
 
-      onUploaded(previewUrl, assetUrl);
-      await _providerBrandingService.sync(
-        businessName: _businessInfo.name,
-        logoUrl: _businessInfo.logoUrl ?? '',
-      );
-      await _providerReactivityService.notifyBusinessChanged();
       return null;
     } catch (error) {
-      if (previewUrl != null) {
-        onUploadFailed(previewUrl);
-      }
       return ProviderBusinessRepository.mapApiError(error);
     } finally {
       _isUploadingAsset = false;
@@ -317,6 +318,8 @@ class ProviderBusinessInfoViewModel extends BaseViewModel {
     _businessInfo.website = profile.website;
     _businessInfo.logoUrl = profile.logoUrl.isEmpty ? null : profile.logoUrl;
     _businessInfo.photoUrls = List<String>.from(profile.photoUrls);
+    _pendingLogoPath = null;
+    _pendingPhotoPaths.clear();
 
     businessNameController.text = profile.businessName;
     locationController.text = profile.location;

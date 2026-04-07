@@ -1,6 +1,5 @@
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
-import 'package:festum/core/services/auth_state_service.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/app_remote_image.dart';
 import 'package:festum/core/widgets/custom_app_bar.dart';
@@ -14,14 +13,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:stacked/stacked.dart';
-
-Map<String, String>? _authorizedImageHeaders() {
-  final String? token = locator<AuthStateService>().accessToken;
-  if (token == null || token.trim().isEmpty) {
-    return null;
-  }
-  return <String, String>{'Authorization': 'Bearer $token'};
-}
 
 class ProviderBusinessInfoView extends StatelessWidget {
   const ProviderBusinessInfoView({super.key});
@@ -73,7 +64,7 @@ class ProviderBusinessInfoView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Informacion que veran los clientes sobre tu negocio.',
+            'Información que verán los clientes sobre tu negocio.',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: AppColors.secondaryText),
@@ -92,11 +83,11 @@ class ProviderBusinessInfoView extends StatelessWidget {
             onTap: () => _runAsyncMessage(context, model.pickLogo),
           ),
           const SizedBox(height: 32),
-          const _SectionLabel(label: 'Informacion basica'),
+          const _SectionLabel(label: 'Información básica'),
           const SizedBox(height: 12),
           _CustomTextField(
             controller: model.businessNameController,
-            hintText: 'Ingresa nombre del negocio',
+            hintText: 'Ingresa el nombre del negocio.',
             onChanged: model.updateName,
             inputKind: ProviderFieldInputKind.title,
           ),
@@ -110,7 +101,7 @@ class ProviderBusinessInfoView extends StatelessWidget {
           const SizedBox(height: 16),
           _CustomTextField(
             controller: model.coverageAreaController,
-            hintText: 'Ej: Teziutlan y municipios cercanos',
+            hintText: 'Ej. Teziutlán y municipios cercanos.',
             onChanged: model.updateCoverageArea,
             maxLines: 2,
             inputKind: ProviderFieldInputKind.mixedText,
@@ -118,7 +109,7 @@ class ProviderBusinessInfoView extends StatelessWidget {
           const SizedBox(height: 16),
           _CustomTextField(
             controller: model.contactNumberController,
-            hintText: 'Numero de contacto',
+            hintText: 'Número de contacto.',
             onChanged: model.updateContactNumber,
             keyboardType: TextInputType.phone,
             inputKind: ProviderFieldInputKind.phone,
@@ -363,7 +354,6 @@ class _LogoUploadCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String rawImageUrl = (imageUrl ?? '').trim();
-    final Map<String, String>? headers = _authorizedImageHeaders();
 
     return InkWell(
       onTap: isUploading ? null : onTap,
@@ -396,7 +386,6 @@ class _LogoUploadCard extends StatelessWidget {
                         fit: BoxFit.cover,
                         width: 72,
                         height: 72,
-                        headers: headers,
                         onForbidden: onForbiddenImage,
                         placeholder: const Icon(
                           Icons.broken_image_outlined,
@@ -412,7 +401,7 @@ class _LogoUploadCard extends StatelessWidget {
                 children: [
                   Text(
                     rawImageUrl.isEmpty
-                        ? 'Anadir logo del negocio'
+                        ? 'Añadir logo del negocio'
                         : 'Cambiar logo del negocio',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
@@ -559,7 +548,6 @@ class _ImageUploadSlot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String rawImageUrl = (imageUrl ?? '').trim();
-    final Map<String, String>? headers = _authorizedImageHeaders();
 
     return InkWell(
       onTap: isUploading ? null : onTap,
@@ -602,7 +590,6 @@ class _ImageUploadSlot extends StatelessWidget {
                   child: AppRemoteImage(
                     imageUrl: rawImageUrl,
                     fit: BoxFit.cover,
-                    headers: headers,
                     onForbidden: onForbiddenImage,
                     placeholder: Container(
                       color: AppColors.backgroundElevated.withValues(

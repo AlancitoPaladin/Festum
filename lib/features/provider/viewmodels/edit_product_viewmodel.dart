@@ -16,6 +16,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:stacked/stacked.dart';
 
 class EditProductViewModel extends BaseViewModel {
+  static const int _uploadImageQuality = 70;
+  static const double _uploadMaxWidth = 1600;
+  static const double _uploadMaxHeight = 1600;
+
   EditProductViewModel({
     required this.productId,
     required GetProviderProductDetailUseCase getProviderProductDetailUseCase,
@@ -58,6 +62,9 @@ class EditProductViewModel extends BaseViewModel {
   bool _hasLoadedInitialData = false;
   bool _isUploadingImage = false;
   String? _mutatingImageKey;
+  String _currentStatus = 'draft';
+  String _initialStatus = 'draft';
+  String _initialContentFingerprint = '';
 
   ProviderProduct? get product => _product;
   ProductFormData get formData => _formData;
@@ -69,6 +76,22 @@ class EditProductViewModel extends BaseViewModel {
   bool get isUploadingImage => _isUploadingImage;
   String? get mutatingImageKey => _mutatingImageKey;
   String? fieldError(String key) => _fieldErrors[key];
+  bool get isPublished => _currentStatus == 'published';
+  bool get isInactive => _currentStatus == 'inactive';
+  bool get isDraft => _currentStatus == 'draft';
+  bool get hasPendingChanges =>
+      _hasLoadedInitialData &&
+      (_contentFingerprint() != _initialContentFingerprint ||
+          _currentStatus != _initialStatus);
+  String get statusLabel {
+    if (isPublished) {
+      return 'Publicado';
+    }
+    if (isInactive) {
+      return 'Inactivo';
+    }
+    return 'Borrador';
+  }
 
   Future<void> initialise() async {
     if (_hasLoadedInitialData || isBusy) {
@@ -82,6 +105,8 @@ class EditProductViewModel extends BaseViewModel {
         productId,
       );
       _applyProduct(result);
+      _initialStatus = _currentStatus;
+      _initialContentFingerprint = _contentFingerprint();
       _hasLoadedInitialData = true;
     } catch (error) {
       _generalErrorMessage = ProviderProductsRepository.mapApiError(
@@ -179,17 +204,23 @@ class EditProductViewModel extends BaseViewModel {
       return false;
     }
 
+    final bool hasContentChanges =
+        _contentFingerprint() != _initialContentFingerprint;
+    final bool hasStatusChanges = _currentStatus != _initialStatus;
+
     _generalErrorMessage = null;
     _fieldErrors.clear();
 
-    if (_formData.name.trim().isEmpty) {
-      _fieldErrors['name'] = 'Ingresa un nombre para el producto.';
-    }
-    if (_formData.price <= 0) {
-      _fieldErrors['price'] = 'Ingresa un precio valido.';
-    }
-    if (_formData.pricingUnit.trim().isEmpty) {
-      _fieldErrors['pricing_unit'] = 'Selecciona una unidad de precio.';
+    if (hasContentChanges) {
+      if (_formData.name.trim().isEmpty) {
+        _fieldErrors['name'] = 'Ingresa un nombre para el producto.';
+      }
+      if (_formData.price <= 0) {
+        _fieldErrors['price'] = 'Ingresa un precio valido.';
+      }
+      if (_formData.pricingUnit.trim().isEmpty) {
+        _fieldErrors['pricing_unit'] = 'Selecciona una unidad de precio.';
+      }
     }
 
     if (_fieldErrors.isNotEmpty) {
@@ -199,14 +230,30 @@ class EditProductViewModel extends BaseViewModel {
 
     setBusy(true);
     try {
-      final ProviderProduct updated = await _updateProviderProductUseCase(
-        productId,
-        UpdateProviderProductRequest.fromForm(
-          category: currentCategory,
-          formData: _formData,
-        ),
-      );
+      ProviderProduct? updated;
+      if (hasContentChanges) {
+        final UpdateProviderProductRequest request = _buildUpdateRequest(
+          currentCategory,
+        );
+        updated = await _updateProviderProductUseCase(
+          productId,
+          request,
+        );
+      }
+      if (hasStatusChanges) {
+        updated = await _updateProviderProductStatusUseCase(
+          productId: productId,
+          status: _currentStatus,
+        );
+      }
+
+      if (updated == null) {
+        return true;
+      }
+
       _applyProduct(updated);
+      _initialStatus = _currentStatus;
+      _initialContentFingerprint = _contentFingerprint();
       await _providerReactivityService.notifyProductsChanged();
       await _providerReactivityService.notifyServicesChanged();
       return true;
@@ -239,7 +286,9 @@ class EditProductViewModel extends BaseViewModel {
     try {
       final XFile? selectedFile = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 85,
+        imageQuality: _uploadImageQuality,
+        maxWidth: _uploadMaxWidth,
+        maxHeight: _uploadMaxHeight,
       );
       if (selectedFile == null) {
         return null;
@@ -375,29 +424,14 @@ class EditProductViewModel extends BaseViewModel {
       return 'No se encontro el producto.';
     }
 
-    setBusy(true);
-    try {
-      final ProviderProduct updated = await _updateProviderProductStatusUseCase(
-        productId: productId,
-        status: status,
-      );
-      _applyProduct(updated);
-      await _providerReactivityService.notifyProductsChanged();
-      await _providerReactivityService.notifyServicesChanged();
-      return null;
-    } catch (error) {
-      return ProviderProductsRepository.mapApiError(
-        error,
-        fallbackMessage: 'No se pudo actualizar el estado del producto.',
-      );
-    } finally {
-      setBusy(false);
-      notifyListeners();
-    }
+    _currentStatus = status;
+    notifyListeners();
+    return null;
   }
 
   void _applyProduct(ProviderProduct product) {
     _product = product;
+    _currentStatus = product.normalizedStatus;
     _initializeCategoryFields(product.category);
 
     _formData
@@ -440,6 +474,41 @@ class EditProductViewModel extends BaseViewModel {
       ..addAll(product.images);
   }
 
+  String _contentFingerprint() {
+    return <String>[
+      _formData.name.trim(),
+      _formData.price.toString(),
+      _formData.pricingUnit.trim(),
+      _formData.description.trim(),
+      _formData.stock.toString(),
+      (_formData.minGuests ?? '').toString(),
+      (_formData.maxGuests ?? '').toString(),
+      (_formData.menuIncluded ?? '').trim(),
+      (_formData.dimensions ?? '').trim(),
+      (_formData.weight ?? '').trim(),
+      (_formData.colorMaterial ?? '').trim(),
+      (_formData.venueCapacity ?? '').trim(),
+      (_formData.minDuration ?? '').trim(),
+      (_formData.approxPhotos ?? '').toString(),
+      (_formData.deliveryTime ?? '').trim(),
+      (_formData.setupTime ?? '').trim(),
+      _formData.banquetType?.trim() ?? '',
+      _formData.decorationType?.trim() ?? '',
+      _formData.extraHourAllowed.toString(),
+      _formData.extraHourPrice.toString(),
+      _formData.isPricePerHour.toString(),
+      _images
+          .map((ProviderProductImage image) => '${image.key}:${image.isMain}')
+          .join('|'),
+      _formData.inclusions.entries
+          .map((entry) => '${entry.key}:${entry.value}')
+          .join('|'),
+      _formData.policies.entries
+          .map((entry) => '${entry.key}:${entry.value}')
+          .join('|'),
+    ].join('::');
+  }
+
   void _initializeCategoryFields(ServiceCategory category) {
     switch (category) {
       case ServiceCategory.dj:
@@ -456,7 +525,7 @@ class EditProductViewModel extends BaseViewModel {
           'Dron': false,
           'Album impreso': false,
           'Edicion profesional': false,
-          'Galeria online': false,
+          'Galería en línea': false,
         };
         break;
       case ServiceCategory.venue:
@@ -543,6 +612,128 @@ class EditProductViewModel extends BaseViewModel {
       imageUrls: imageUrls,
       images: List<ProviderProductImage>.from(_images),
     );
+  }
+
+  UpdateProviderProductRequest _buildUpdateRequest(
+    ServiceCategory currentCategory,
+  ) {
+    final ProviderProduct? original = _product;
+    final Map<String, dynamic> currentDetails = _buildCurrentDetails(
+      currentCategory,
+    );
+    final Map<String, dynamic> originalDetails =
+        original?.details ?? <String, dynamic>{};
+
+    return UpdateProviderProductRequest(
+      name: original == null || original.name != _formData.name
+          ? _formData.name
+          : null,
+      description:
+          original == null || original.description != _formData.description
+          ? _formData.description
+          : null,
+      price: original == null || original.price != _formData.price
+          ? _formData.price
+          : null,
+      pricingUnit:
+          original == null || original.pricingUnit != _formData.pricingUnit
+          ? _formData.pricingUnit
+          : null,
+      details: !_mapsEqual(currentDetails, originalDetails)
+          ? currentDetails
+          : null,
+      inclusions:
+          original == null ||
+              !_boolMapsEqual(_formData.inclusions, original.inclusions)
+          ? Map<String, bool>.from(_formData.inclusions)
+          : null,
+      policies:
+          original == null ||
+              !_boolMapsEqual(_formData.policies, original.policies)
+          ? Map<String, bool>.from(_formData.policies)
+          : null,
+    );
+  }
+
+  Map<String, dynamic> _buildCurrentDetails(ServiceCategory category) {
+    final Map<String, dynamic> details = <String, dynamic>{};
+
+    void addValue(String key, dynamic value) {
+      if (value == null) {
+        return;
+      }
+      if (value is String && value.trim().isEmpty) {
+        return;
+      }
+      details[key] = value;
+    }
+
+    switch (category) {
+      case ServiceCategory.dj:
+      case ServiceCategory.entertainment:
+        addValue('min_duration', _formData.minDuration);
+        addValue('extra_hour_allowed', _formData.extraHourAllowed);
+        addValue('extra_hour_price', _formData.extraHourPrice);
+        break;
+      case ServiceCategory.photography:
+        addValue('approx_photos', _formData.approxPhotos);
+        addValue('delivery_time', _formData.deliveryTime);
+        addValue('min_duration', _formData.minDuration);
+        addValue('extra_hour_allowed', _formData.extraHourAllowed);
+        addValue('extra_hour_price', _formData.extraHourPrice);
+        break;
+      case ServiceCategory.banquet:
+        addValue('banquet_type', _formData.banquetType);
+        addValue('min_guests', _formData.minGuests);
+        addValue('max_guests', _formData.maxGuests);
+        addValue('menu_included', _formData.menuIncluded);
+        break;
+      case ServiceCategory.furniture:
+      case ServiceCategory.equipment:
+        addValue('stock', _formData.stock);
+        addValue('dimensions', _formData.dimensions);
+        addValue('weight', _formData.weight);
+        addValue('color_material', _formData.colorMaterial);
+        break;
+      case ServiceCategory.venue:
+        addValue('venue_capacity', _formData.venueCapacity);
+        addValue('is_price_per_hour', _formData.isPricePerHour);
+        break;
+      case ServiceCategory.decoration:
+        addValue('decoration_type', _formData.decorationType);
+        addValue('setup_time', _formData.setupTime);
+        break;
+    }
+
+    return details;
+  }
+
+  bool _mapsEqual(Map<String, dynamic> a, Map<String, dynamic> b) {
+    if (a.length != b.length) {
+      return false;
+    }
+
+    for (final MapEntry<String, dynamic> entry in a.entries) {
+      if (!b.containsKey(entry.key) || b[entry.key] != entry.value) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  bool _boolMapsEqual(Map<String, bool> a, Map<String, bool> b) {
+    if (a.length != b.length) {
+      return false;
+    }
+
+    for (final MapEntry<String, bool> entry in a.entries) {
+      if (b[entry.key] != entry.value) {
+        return false;
+      }
+    }
+
+    return true;
   }
 }
 
