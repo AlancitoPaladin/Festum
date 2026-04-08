@@ -53,11 +53,11 @@ class ManualBookingView extends StatelessWidget {
               _buildSectionCard(
                 title: 'Datos principales',
                 subtitle:
-                    'Llena lo esencial y usa el horario solo si necesitas apartar una franja especifica.',
+                    'Llena lo esencial y usa el horario solo si necesitas apartar una franja específica.',
                 children: [
                   _buildField(
                     label: 'Nombre del cliente',
-                    hint: 'Ej: Juan Perez',
+                    hint: 'Ej: Juan Pérez',
                     controller: model.customerNameController,
                     inputKind: ProviderFieldInputKind.title,
                   ),
@@ -85,9 +85,9 @@ class ManualBookingView extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   _buildSwitchTile(
-                    title: 'Agregar horario especifico',
+                    title: 'Agregar horario específico',
                     subtitle:
-                        'Si lo dejas apagado, la reserva queda como recordatorio o bloqueo general del dia.',
+                        'Si lo dejas apagado, la reserva queda como recordatorio o bloqueo general del día.',
                     value: model.hasSpecificSchedule,
                     onChanged: model.toggleSpecificSchedule,
                   ),
@@ -178,7 +178,7 @@ class ManualBookingView extends StatelessWidget {
                   const SizedBox(height: 16),
                   _buildField(
                     label: 'Ubicacion',
-                    hint: 'Ej: Jardin Las Palmas, Monterrey',
+                    hint: 'Ej: Jardín Las Palmas, Monterrey',
                     controller: model.eventLocationController,
                     inputKind: ProviderFieldInputKind.mixedText,
                   ),

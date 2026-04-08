@@ -6,14 +6,14 @@ class ProviderNotificationsViewModel extends BaseViewModel {
     ProviderNotification(
       id: 'mock-notification-1',
       title: 'Nueva reserva recibida',
-      subtitle: 'Mariana Lopez solicito informacion para el 20 de agosto.',
+      subtitle: 'Mariana López solicitó información para el 20 de agosto.',
       createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
       isUnread: true,
     ),
     ProviderNotification(
       id: 'mock-notification-2',
       title: 'Recordatorio de evento',
-      subtitle: 'Tienes un servicio programado para manana a las 18:00.',
+      subtitle: 'Tienes un servicio programado para mañana a las 18:00.',
       createdAt: DateTime.now().subtract(const Duration(hours: 1)),
       isUnread: true,
     ),
@@ -26,7 +26,7 @@ class ProviderNotificationsViewModel extends BaseViewModel {
     ProviderNotification(
       id: 'mock-notification-4',
       title: 'Pago confirmado',
-      subtitle: 'Se confirmo el anticipo de una reserva reciente.',
+      subtitle: 'Se confirmó el anticipo de una reserva reciente.',
       createdAt: DateTime.now().subtract(const Duration(days: 2)),
     ),
   ];

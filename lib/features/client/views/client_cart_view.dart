@@ -5,10 +5,13 @@ import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/network/api_error_mapper.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/features/client/models/client_cart_item.dart';
+import 'package:festum/features/client/models/client_product_availability.dart';
 import 'package:festum/features/client/models/client_tab.dart';
+import 'package:festum/features/client/services/client_query_cache_service.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
 import 'package:festum/features/client/usecases/checkout_cart_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_cart_items_use_case.dart';
+import 'package:festum/features/client/usecases/get_client_product_availability_use_case.dart';
 import 'package:festum/features/client/usecases/remove_client_cart_item_use_case.dart';
 import 'package:festum/features/client/usecases/restore_client_cart_item_use_case.dart';
 import 'package:festum/features/client/widgets/client_feedback.dart';
@@ -29,6 +32,8 @@ class ClientCartView extends StatefulWidget {
 class _ClientCartViewState extends State<ClientCartView> {
   late final GetClientCartItemsUseCase _getClientCartItemsUseCase;
   late final CheckoutCartUseCase _checkoutCartUseCase;
+  late final GetClientProductAvailabilityUseCase
+  _getClientProductAvailabilityUseCase;
   late final RemoveClientCartItemUseCase _removeClientCartItemUseCase;
   late final RestoreClientCartItemUseCase _restoreClientCartItemUseCase;
   late final ClientTabUiStateService _tabUiStateService;
@@ -46,6 +51,8 @@ class _ClientCartViewState extends State<ClientCartView> {
     super.initState();
     _getClientCartItemsUseCase = locator<GetClientCartItemsUseCase>();
     _checkoutCartUseCase = locator<CheckoutCartUseCase>();
+    _getClientProductAvailabilityUseCase =
+        locator<GetClientProductAvailabilityUseCase>();
     _removeClientCartItemUseCase = locator<RemoveClientCartItemUseCase>();
     _restoreClientCartItemUseCase = locator<RestoreClientCartItemUseCase>();
     _tabUiStateService = locator<ClientTabUiStateService>();
@@ -71,8 +78,20 @@ class _ClientCartViewState extends State<ClientCartView> {
   }
 
   Future<void> _loadCart({required bool showLoader}) async {
+    final ClientQueryCacheService cache = locator<ClientQueryCacheService>();
     if (showLoader) {
-      setState(() => _isLoading = true);
+      final List<ClientCartItem>? cached = cache
+          .getIfPresent<List<ClientCartItem>>('client_cart/items');
+      final bool hasCachedVisibleData = cached != null && cached.isNotEmpty;
+      if (hasCachedVisibleData) {
+        setState(() {
+          _cartItems = cached;
+          _errorMessage = null;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = true);
+      }
     }
 
     try {
@@ -91,6 +110,19 @@ class _ClientCartViewState extends State<ClientCartView> {
       }
     } catch (error) {
       if (!mounted) {
+        return;
+      }
+      final bool hasVisibleData = _cartItems.isNotEmpty;
+      if (hasVisibleData) {
+        setState(() => _isLoading = false);
+        ClientFeedback.showMessage(
+          context,
+          message: ApiErrorMapper.toUserMessage(
+            error,
+            fallback:
+                'No se pudo refrescar el carrito. Mostrando últimos datos.',
+          ),
+        );
         return;
       }
       setState(() {
@@ -172,6 +204,9 @@ class _ClientCartViewState extends State<ClientCartView> {
     DateTime selectedDate =
         _requestedEventDate ?? DateTime.now().add(const Duration(days: 7));
     String notesValue = _requestNotes;
+    Map<String, _CheckoutAvailabilityState> availabilityByService =
+        <String, _CheckoutAvailabilityState>{};
+    bool isValidatingAvailability = false;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -182,39 +217,39 @@ class _ClientCartViewState extends State<ClientCartView> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (BuildContext context) {
-        return SafeArea(
-          child: AnimatedPadding(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOut,
-            padding: EdgeInsets.fromLTRB(
-              20,
-              12,
-              20,
-              24 + MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Confirmar orden',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Revisa el resumen antes de continuar con el pago.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Fecha del evento',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  StatefulBuilder(
-                    builder: (BuildContext context, StateSetter setModalState) {
-                      return OutlinedButton.icon(
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return SafeArea(
+              child: AnimatedPadding(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  12,
+                  20,
+                  24 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Confirmar orden',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Revisa el resumen antes de continuar con el pago.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Fecha del evento',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
                         onPressed: _isCheckingOut
                             ? null
                             : () async {
@@ -240,93 +275,189 @@ class _ClientCartViewState extends State<ClientCartView> {
                               },
                         icon: const Icon(Icons.event_rounded),
                         label: Text(_formatDate(selectedDate)),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    initialValue: notesValue,
-                    maxLines: 2,
-                    textInputAction: TextInputAction.done,
-                    onChanged: (String value) => notesValue = value,
-                    decoration: const InputDecoration(
-                      labelText: 'Notas para el proveedor (opcional)',
-                      hintText: 'Ej. Horario preferido, tipo de evento...',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Elementos',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 10),
-                  ..._cartItems.map((ClientCartItem item) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _CheckoutItemRow(
-                        title: item.resolvedServiceName,
-                        subtitle: item.resolvedProductName,
-                        amount: _formatCurrency(item.unitPriceCents),
                       ),
-                    );
-                  }),
-                  const Divider(height: 20),
-                  _SummaryRow(
-                    label: 'Subtotal',
-                    value: _formatCurrency(totals.subtotal),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        initialValue: notesValue,
+                        maxLines: 2,
+                        textInputAction: TextInputAction.done,
+                        onChanged: (String value) => notesValue = value,
+                        decoration: const InputDecoration(
+                          labelText: 'Notas para el proveedor (opcional)',
+                          hintText: 'Ej. Horario preferido, tipo de evento...',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Elementos',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 10),
+                      ..._cartItems.map((ClientCartItem item) {
+                        final _CheckoutAvailabilityState? state =
+                            availabilityByService[item.id];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _CheckoutItemRow(
+                            title: item.resolvedServiceName,
+                            subtitle: item.resolvedProductName,
+                            amount: _formatCurrency(item.unitPriceCents),
+                            availabilityState: state,
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Disponibilidad sujeta a fecha seleccionada.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const Divider(height: 20),
+                      _SummaryRow(
+                        label: 'Subtotal',
+                        value: _formatCurrency(totals.subtotal),
+                      ),
+                      _SummaryRow(
+                        label: 'Cargo de servicio (5%)',
+                        value: _formatCurrency(totals.serviceFee),
+                      ),
+                      _SummaryRow(
+                        label: 'Impuestos (16%)',
+                        value: _formatCurrency(totals.tax),
+                      ),
+                      const Divider(height: 20),
+                      _SummaryRow(
+                        label: 'Total estimado',
+                        value: _formatCurrency(totals.total),
+                        emphasis: true,
+                      ),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed:
+                              (_isCheckingOut || isValidatingAvailability)
+                              ? null
+                              : () async {
+                                  setModalState(
+                                    () => isValidatingAvailability = true,
+                                  );
+                                  final _CheckoutAvailabilityValidation
+                                  validation =
+                                      await _validateAvailabilityForDate(
+                                        selectedDate,
+                                      );
+                                  if (!mounted) {
+                                    return;
+                                  }
+                                  setModalState(() {
+                                    availabilityByService =
+                                        validation.byServiceId;
+                                    isValidatingAvailability = false;
+                                  });
+                                  if (!validation.canProceed) {
+                                    final List<DateTime> suggestedDates =
+                                        await _suggestAlternativeDates(
+                                          selectedDate,
+                                        );
+                                    if (!mounted) {
+                                      return;
+                                    }
+                                    final DateTime? pickedAlternative =
+                                        await _showUnavailableServicesDialog(
+                                          validation.unavailableServiceNames,
+                                          selectedDate: selectedDate,
+                                          suggestedDates: suggestedDates,
+                                        );
+                                    if (pickedAlternative != null) {
+                                      setModalState(() {
+                                        selectedDate = pickedAlternative;
+                                        availabilityByService =
+                                            <
+                                              String,
+                                              _CheckoutAvailabilityState
+                                            >{};
+                                        isValidatingAvailability = true;
+                                      });
+                                      final _CheckoutAvailabilityValidation
+                                      alternativeValidation =
+                                          await _validateAvailabilityForDate(
+                                            pickedAlternative,
+                                          );
+                                      if (!mounted) {
+                                        return;
+                                      }
+                                      setModalState(() {
+                                        availabilityByService =
+                                            alternativeValidation.byServiceId;
+                                        isValidatingAvailability = false;
+                                      });
+                                      if (!alternativeValidation.canProceed) {
+                                        ClientFeedback.showMessage(
+                                          this.context,
+                                          message:
+                                              'La fecha sugerida tampoco está disponible. Elige otra fecha.',
+                                        );
+                                        return;
+                                      }
+                                      _requestedEventDate = pickedAlternative;
+                                      _requestNotes = notesValue.trim();
+                                      if (!context.mounted) {
+                                        return;
+                                      }
+                                      Navigator.of(context).pop();
+                                      await _confirmCheckout(
+                                        eventDate: pickedAlternative,
+                                        notes: _requestNotes,
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  _requestedEventDate = selectedDate;
+                                  _requestNotes = notesValue.trim();
+                                  if (!context.mounted) {
+                                    return;
+                                  }
+                                  Navigator.of(context).pop();
+                                  await _confirmCheckout(
+                                    eventDate: selectedDate,
+                                    notes: _requestNotes,
+                                  );
+                                },
+                          child: _isCheckingOut
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : isValidatingAvailability
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Confirmar y continuar'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: _isCheckingOut
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                          child: const Text('Seguir editando'),
+                        ),
+                      ),
+                    ],
                   ),
-                  _SummaryRow(
-                    label: 'Cargo de servicio (5%)',
-                    value: _formatCurrency(totals.serviceFee),
-                  ),
-                  _SummaryRow(
-                    label: 'Impuestos (16%)',
-                    value: _formatCurrency(totals.tax),
-                  ),
-                  const Divider(height: 20),
-                  _SummaryRow(
-                    label: 'Total estimado',
-                    value: _formatCurrency(totals.total),
-                    emphasis: true,
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isCheckingOut
-                          ? null
-                          : () async {
-                              _requestedEventDate = selectedDate;
-                              _requestNotes = notesValue.trim();
-                              Navigator.of(context).pop();
-                              await _confirmCheckout(
-                                eventDate: selectedDate,
-                                notes: _requestNotes,
-                              );
-                            },
-                      child: _isCheckingOut
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Confirmar y continuar'),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: _isCheckingOut
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      child: const Text('Seguir editando'),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -407,6 +538,157 @@ class _ClientCartViewState extends State<ClientCartView> {
     final String month = date.month.toString().padLeft(2, '0');
     final String year = date.year.toString();
     return '$day/$month/$year';
+  }
+
+  Future<_CheckoutAvailabilityValidation> _validateAvailabilityForDate(
+    DateTime date, {
+    Map<String, ClientProductAvailabilityResponse>? monthByProductId,
+  }) async {
+    final Map<String, _CheckoutAvailabilityState> byServiceId =
+        <String, _CheckoutAvailabilityState>{};
+    final Map<String, ClientProductAvailabilityResponse> monthCache =
+        monthByProductId ?? <String, ClientProductAvailabilityResponse>{};
+    final int year = date.year;
+    final int month = date.month;
+
+    for (final ClientCartItem item in _cartItems) {
+      final List<String> productIds = item.selectedProductIds.isNotEmpty
+          ? item.selectedProductIds
+          : <String>[
+              if ((item.productId ?? '').trim().isNotEmpty) item.productId!,
+            ];
+      if (productIds.isEmpty) {
+        byServiceId[item.id] = const _CheckoutAvailabilityState.unchecked();
+        continue;
+      }
+
+      bool anyUnavailable = false;
+      bool anyAvailable = false;
+      for (final String productId in productIds) {
+        final String normalizedProductId = productId.trim();
+        if (normalizedProductId.isEmpty) {
+          continue;
+        }
+        final ClientProductAvailabilityResponse response =
+            monthCache[normalizedProductId] ??
+            await _getClientProductAvailabilityUseCase(
+              productId: normalizedProductId,
+              year: year,
+              month: month,
+            );
+        monthCache[normalizedProductId] = response;
+        final ClientAvailabilityDay? day = response.days
+            .cast<ClientAvailabilityDay?>()
+            .firstWhere(
+              (ClientAvailabilityDay? value) =>
+                  value != null &&
+                  value.date.year == year &&
+                  value.date.month == month &&
+                  value.date.day == date.day,
+              orElse: () => null,
+            );
+        if (day == null) {
+          continue;
+        }
+        if (day.status == ClientAvailabilityStatus.available) {
+          anyAvailable = true;
+          continue;
+        }
+        anyUnavailable = true;
+      }
+
+      if (anyUnavailable) {
+        byServiceId[item.id] = const _CheckoutAvailabilityState.unavailable();
+      } else if (anyAvailable) {
+        byServiceId[item.id] = const _CheckoutAvailabilityState.available();
+      } else {
+        byServiceId[item.id] = const _CheckoutAvailabilityState.unchecked();
+      }
+    }
+
+    final List<String> unavailableServiceNames = _cartItems
+        .where(
+          (ClientCartItem item) =>
+              byServiceId[item.id]?.status ==
+              _CheckoutAvailabilityStatus.unavailable,
+        )
+        .map((ClientCartItem item) => item.resolvedServiceName)
+        .toList();
+
+    return _CheckoutAvailabilityValidation(
+      byServiceId: byServiceId,
+      unavailableServiceNames: unavailableServiceNames,
+    );
+  }
+
+  Future<List<DateTime>> _suggestAlternativeDates(DateTime selectedDate) async {
+    final Map<String, ClientProductAvailabilityResponse> monthCache =
+        <String, ClientProductAvailabilityResponse>{};
+    final List<DateTime> suggestions = <DateTime>[];
+    DateTime cursor = selectedDate.add(const Duration(days: 1));
+    int attempts = 0;
+    while (suggestions.length < 3 && attempts < 14) {
+      final _CheckoutAvailabilityValidation validation =
+          await _validateAvailabilityForDate(
+            cursor,
+            monthByProductId: monthCache,
+          );
+      if (validation.canProceed) {
+        suggestions.add(cursor);
+      }
+      cursor = cursor.add(const Duration(days: 1));
+      attempts += 1;
+    }
+    return suggestions;
+  }
+
+  Future<DateTime?> _showUnavailableServicesDialog(
+    List<String> serviceNames, {
+    required DateTime selectedDate,
+    required List<DateTime> suggestedDates,
+  }) {
+    return showDialog<DateTime?>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Fecha no disponible'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'No hay disponibilidad para el ${_formatDate(selectedDate)} en:\n\n${serviceNames.join('\n')}',
+                ),
+                if (suggestedDates.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 14),
+                  const Text('Fechas sugeridas:'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: suggestedDates
+                        .map(
+                          (DateTime date) => OutlinedButton(
+                            onPressed: () => Navigator.of(context).pop(date),
+                            child: Text(_formatDate(date)),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: const Text('Entendido'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   _CartTotals _calculateTotals() {
@@ -628,11 +910,13 @@ class _CheckoutItemRow extends StatelessWidget {
     required this.title,
     required this.amount,
     this.subtitle,
+    this.availabilityState,
   });
 
   final String title;
   final String? subtitle;
   final String amount;
+  final _CheckoutAvailabilityState? availabilityState;
 
   @override
   Widget build(BuildContext context) {
@@ -651,6 +935,27 @@ class _CheckoutItemRow extends StatelessWidget {
               ),
               if (subtitle != null && subtitle!.trim().isNotEmpty)
                 Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+              if (availabilityState != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    children: <Widget>[
+                      Icon(
+                        availabilityState!.icon,
+                        size: 14,
+                        color: availabilityState!.color,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        availabilityState!.label,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: availabilityState!.color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
@@ -664,4 +969,64 @@ class _CheckoutItemRow extends StatelessWidget {
       ],
     );
   }
+}
+
+enum _CheckoutAvailabilityStatus { available, unavailable, unchecked }
+
+class _CheckoutAvailabilityState {
+  const _CheckoutAvailabilityState._(this.status);
+
+  const _CheckoutAvailabilityState.available()
+    : this._(_CheckoutAvailabilityStatus.available);
+  const _CheckoutAvailabilityState.unavailable()
+    : this._(_CheckoutAvailabilityStatus.unavailable);
+  const _CheckoutAvailabilityState.unchecked()
+    : this._(_CheckoutAvailabilityStatus.unchecked);
+
+  final _CheckoutAvailabilityStatus status;
+
+  String get label {
+    switch (status) {
+      case _CheckoutAvailabilityStatus.available:
+        return 'Disponible para la fecha';
+      case _CheckoutAvailabilityStatus.unavailable:
+        return 'No disponible para la fecha';
+      case _CheckoutAvailabilityStatus.unchecked:
+        return 'Disponibilidad por confirmar';
+    }
+  }
+
+  Color get color {
+    switch (status) {
+      case _CheckoutAvailabilityStatus.available:
+        return AppColors.activeIcon;
+      case _CheckoutAvailabilityStatus.unavailable:
+        return AppColors.alert;
+      case _CheckoutAvailabilityStatus.unchecked:
+        return AppColors.secondaryText;
+    }
+  }
+
+  IconData get icon {
+    switch (status) {
+      case _CheckoutAvailabilityStatus.available:
+        return Icons.check_circle_rounded;
+      case _CheckoutAvailabilityStatus.unavailable:
+        return Icons.error_outline_rounded;
+      case _CheckoutAvailabilityStatus.unchecked:
+        return Icons.help_outline_rounded;
+    }
+  }
+}
+
+class _CheckoutAvailabilityValidation {
+  const _CheckoutAvailabilityValidation({
+    required this.byServiceId,
+    required this.unavailableServiceNames,
+  });
+
+  final Map<String, _CheckoutAvailabilityState> byServiceId;
+  final List<String> unavailableServiceNames;
+
+  bool get canProceed => unavailableServiceNames.isEmpty;
 }

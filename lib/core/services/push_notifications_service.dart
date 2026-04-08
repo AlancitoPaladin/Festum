@@ -57,8 +57,8 @@ class PushNotificationsService {
     try {
       await Firebase.initializeApp();
       _firebaseReady = true;
-    } catch (error) {
-      debugPrint('Push init skipped (Firebase not configured): $error');
+    } catch (_) {
+      debugPrint('Push init skipped (Firebase not configured).');
       return;
     }
 

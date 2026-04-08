@@ -9,6 +9,8 @@ class ApiClient {
   static const String _clientBasePath = '/api/v1/client';
   static const String _providersBasePath = '/api/v1/providers';
   static const String _notificationsBasePath = '/api/v1/notifications';
+  static const Duration _homeServicesReceiveTimeout = Duration(seconds: 30);
+  static const Duration _bootstrapReceiveTimeout = Duration(seconds: 30);
 
   Future<Response<dynamic>> healthCheck() {
     return _dio.get<dynamic>('/health');
@@ -79,9 +81,22 @@ class ApiClient {
 
   Future<Map<String, List<Map<String, dynamic>>>>
   getClientServicesHome() async {
-    final Response<dynamic> response = await _dio.get<dynamic>(
-      '$_clientBasePath/services/home',
-    );
+    Response<dynamic> response;
+    try {
+      response = await _dio.get<dynamic>(
+        '$_clientBasePath/services/home',
+        options: Options(receiveTimeout: _homeServicesReceiveTimeout),
+      );
+    } on DioException catch (error) {
+      if (!_isRetryableHomeError(error)) {
+        rethrow;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 450));
+      response = await _dio.get<dynamic>(
+        '$_clientBasePath/services/home',
+        options: Options(receiveTimeout: _homeServicesReceiveTimeout),
+      );
+    }
 
     final Map<String, dynamic> data = _toMap(response.data);
     final Map<String, List<Map<String, dynamic>>> sections =
@@ -92,6 +107,35 @@ class ApiClient {
     }
 
     return sections;
+  }
+
+  Future<Map<String, dynamic>> getClientBootstrap() async {
+    Response<dynamic> response;
+    try {
+      response = await _dio.get<dynamic>(
+        '$_clientBasePath/bootstrap',
+        options: Options(receiveTimeout: _bootstrapReceiveTimeout),
+      );
+    } on DioException catch (error) {
+      if (!_isRetryableHomeError(error)) {
+        rethrow;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 450));
+      response = await _dio.get<dynamic>(
+        '$_clientBasePath/bootstrap',
+        options: Options(receiveTimeout: _bootstrapReceiveTimeout),
+      );
+    }
+    return _toMap(response.data);
+  }
+
+  bool _isRetryableHomeError(DioException error) {
+    if (error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.connectionError) {
+      return true;
+    }
+    return false;
   }
 
   Future<List<Map<String, dynamic>>> getClientServicesByCategory({
@@ -112,18 +156,63 @@ class ApiClient {
     required String category,
     required String serviceId,
   }) async {
-    try {
-      final Response<dynamic> response = await _dio.get<dynamic>(
-        '$_clientBasePath/services/$serviceId',
-        queryParameters: <String, dynamic>{'category': category},
-      );
+    final Set<String> attemptedCategories = <String>{};
+    final List<String> categoriesToTry = <String>[
+      category,
+      ..._clientServiceCategoryFallbacks(category),
+    ];
 
-      return _toMap(response.data);
-    } on DioException catch (error) {
-      if (error.response?.statusCode == 404) {
-        return null;
+    for (final String candidate in categoriesToTry) {
+      final String normalized = candidate.trim();
+      if (normalized.isEmpty || !attemptedCategories.add(normalized)) {
+        continue;
       }
-      rethrow;
+      try {
+        final Response<dynamic> response = await _dio.get<dynamic>(
+          '$_clientBasePath/services/$serviceId',
+          queryParameters: <String, dynamic>{'category': normalized},
+        );
+        return _toMap(response.data);
+      } on DioException catch (error) {
+        if (error.response?.statusCode == 404) {
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    return null;
+  }
+
+  List<String> _clientServiceCategoryFallbacks(String category) {
+    switch (category.trim().toLowerCase()) {
+      case 'salones-sociales':
+        return const <String>['venue'];
+      case 'venue':
+        return const <String>['salones-sociales'];
+      case 'mobiliario':
+        return const <String>['furniture', 'equipment'];
+      case 'furniture':
+      case 'equipment':
+        return const <String>['mobiliario'];
+      case 'banquetes':
+        return const <String>['banquet'];
+      case 'banquet':
+        return const <String>['banquetes'];
+      case 'entretenimiento':
+        return const <String>['entertainment'];
+      case 'entertainment':
+        return const <String>['entretenimiento'];
+      case 'decoracion':
+        return const <String>['decoration'];
+      case 'decoration':
+        return const <String>['decoracion'];
+      case 'fotografia':
+        return const <String>['photography'];
+      case 'photography':
+        return const <String>['fotografia'];
+      default:
+        return const <String>[];
     }
   }
 
@@ -210,14 +299,50 @@ class ApiClient {
     await _dio.delete<dynamic>('$_clientBasePath/cart');
   }
 
-  Future<List<Map<String, dynamic>>> getClientOrders() async {
+  Future<List<Map<String, dynamic>>> getClientOrders({
+    bool includeItems = false,
+  }) async {
     final Response<dynamic> response = await _dio.get<dynamic>(
       '$_clientBasePath/orders',
+      queryParameters: <String, dynamic>{
+        if (includeItems) 'include_items': true,
+      },
     );
     return _extractItemsList(
       response.data,
       keys: const <String>['items', 'orders', 'results'],
     );
+  }
+
+  Future<Set<String>> getClientActiveOrderServiceIds() async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '$_clientBasePath/orders/active-service-ids',
+    );
+    final Map<String, dynamic> data = _toMap(response.data);
+    final dynamic raw = data['service_ids'] ?? data['items'] ?? <dynamic>[];
+    if (raw is! List) {
+      return <String>{};
+    }
+    return raw
+        .map((dynamic value) => value.toString().trim())
+        .where((String value) => value.isNotEmpty)
+        .toSet();
+  }
+
+  Future<Map<String, dynamic>?> getClientOrderById({
+    required String orderId,
+  }) async {
+    try {
+      final Response<dynamic> response = await _dio.get<dynamic>(
+        '$_clientBasePath/orders/$orderId',
+      );
+      return _toMap(response.data);
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) {
+        return null;
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> createClientOrder({

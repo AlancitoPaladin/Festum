@@ -204,9 +204,6 @@ class EditServiceView extends StatelessWidget {
                       errorText: model.fieldError('unit_price_cents'),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  _PricePreviewCard(cents: model.formData.unitPriceCents),
-                  const SizedBox(height: 10),
                   _InfoCard(
                     title: model.formData.unitPriceCents > 0
                         ? 'Precio actual de referencia'
@@ -322,9 +319,7 @@ class EditServiceView extends StatelessWidget {
       ).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Estado listo. Guarda cambios para aplicarlo.'),
       ),
@@ -540,67 +535,6 @@ class EditServiceView extends StatelessWidget {
   }
 }
 
-class _PricePreviewCard extends StatelessWidget {
-  const _PricePreviewCard({required this.cents});
-
-  final int cents;
-
-  @override
-  Widget build(BuildContext context) {
-    final String centsLabel = _formatInteger(cents);
-    final String amountLabel = _formatMxAmount(cents);
-    final bool hasInvalidAmount = cents <= 0;
-    final Color borderColor = hasInvalidAmount
-        ? Colors.orange.withValues(alpha: 0.45)
-        : Colors.transparent;
-    final Color backgroundColor = hasInvalidAmount
-        ? Colors.orange.withValues(alpha: 0.10)
-        : AppColors.backgroundElevated.withValues(alpha: 0.6);
-    final Color textColor = hasInvalidAmount
-        ? Colors.orange.shade800
-        : AppColors.secondaryText;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          if (hasInvalidAmount) ...<Widget>[
-            Text(
-              'Advertencia: el precio debe ser mayor a 0.',
-              style: TextStyle(
-                color: textColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-          ],
-          Text(
-            'Se enviará: unit_price_cents = $centsLabel',
-            style: TextStyle(
-              color: textColor,
-              fontSize: 12,
-              fontFamily: 'monospace',
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Equivalente: $amountLabel MXN',
-            style: TextStyle(color: textColor, fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ServiceStatusCard extends StatelessWidget {
   const _ServiceStatusCard({
     required this.statusLabel,
@@ -766,28 +700,6 @@ IconData _iconFor(ServiceCategory? category) {
     case null:
       return Icons.miscellaneous_services_rounded;
   }
-}
-
-String _formatInteger(int value) {
-  final String raw = value.abs().toString();
-  final StringBuffer buffer = StringBuffer();
-  for (int i = 0; i < raw.length; i++) {
-    final int reverseIndex = raw.length - i;
-    buffer.write(raw[i]);
-    if (reverseIndex > 1 && reverseIndex % 3 == 1) {
-      buffer.write(',');
-    }
-  }
-  final String formatted = buffer.toString();
-  return value < 0 ? '-$formatted' : formatted;
-}
-
-String _formatMxAmount(int cents) {
-  final int whole = cents ~/ 100;
-  final int fraction = cents.abs() % 100;
-  final String wholeLabel = _formatInteger(whole);
-  final String fractionLabel = fraction.toString().padLeft(2, '0');
-  return '\$$wholeLabel.$fractionLabel';
 }
 
 class _InfoCard extends StatelessWidget {

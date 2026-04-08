@@ -16,15 +16,15 @@ enum ClientServiceCategory {
     title: 'Banquetes',
     icon: Icons.restaurant_menu_rounded,
   ),
-  dj(slug: 'dj', title: 'Musica / DJ', icon: Icons.music_note_rounded),
+  dj(slug: 'dj', title: 'Música / DJ', icon: Icons.music_note_rounded),
   decoration(
     slug: 'decoracion',
-    title: 'Decoracion',
+    title: 'Decoración',
     icon: Icons.celebration_rounded,
   ),
   photography(
     slug: 'fotografia',
-    title: 'Fotografia y video',
+    title: 'Fotografía y video',
     icon: Icons.camera_alt_rounded,
   ),
   entertainment(
@@ -66,6 +66,7 @@ class ClientServiceItem {
     this.products = const <ClientServiceProduct>[],
     this.imageKey = '',
     this.imageUrl = '',
+    this.galleryImageUrls = const <String>[],
     this.imageExpiresAt,
     this.displayNameShort,
     this.displaySubtitleShort,
@@ -81,6 +82,7 @@ class ClientServiceItem {
   final List<ClientServiceProduct> products;
   final String imageKey;
   final String imageUrl;
+  final List<String> galleryImageUrls;
   final DateTime? imageExpiresAt;
   final String? displayNameShort;
   final String? displaySubtitleShort;
@@ -208,7 +210,7 @@ class ClientServiceCatalog {
         ClientServiceCategory.socialHalls: <ClientServiceItem>[
           ClientServiceItem(
             id: 'hall-norte',
-            name: 'Salon Norte Imperial',
+            name: 'Salón Norte Imperial',
             subtitle: 'Hasta 350 invitados',
             priceLabel: 'Desde \$45,000 MXN',
             unitPriceCents: 4500000,
@@ -217,15 +219,15 @@ class ClientServiceCatalog {
           ClientServiceItem(
             id: 'hall-bosque',
             name: 'Terraza Bosque Alto',
-            subtitle: 'Formato jardin con pista',
+            subtitle: 'Formato jardín con pista',
             priceLabel: 'Desde \$38,500 MXN',
             unitPriceCents: 3850000,
             badge: 'Exterior',
           ),
           ClientServiceItem(
             id: 'hall-aurora',
-            name: 'Salon Aurora',
-            subtitle: 'Paquete completo con iluminacion',
+            name: 'Salón Aurora',
+            subtitle: 'Paquete completo con iluminación',
             priceLabel: 'Desde \$41,200 MXN',
             unitPriceCents: 4120000,
             badge: 'Premium',
@@ -261,15 +263,15 @@ class ClientServiceCatalog {
           ClientServiceItem(
             id: 'banq-signature',
             name: 'Banquete Signature',
-            subtitle: 'Menu gourmet personalizable',
+            subtitle: 'Menú gourmet personalizable',
             priceLabel: 'Desde \$740 p/p',
             unitPriceCents: 74000,
             badge: 'Chef',
           ),
           ClientServiceItem(
             id: 'banq-mex',
-            name: 'Tradicion Mexicana',
-            subtitle: 'Estaciones y menu regional',
+            name: 'Tradición Mexicana',
+            subtitle: 'Estaciones y menú regional',
             priceLabel: 'Desde \$590 p/p',
             unitPriceCents: 59000,
             badge: 'Tradicional',
@@ -287,7 +289,7 @@ class ClientServiceCatalog {
           ClientServiceItem(
             id: 'dj-night',
             name: 'DJ Night Experience',
-            subtitle: 'Audio, cabina e iluminacion',
+            subtitle: 'Audio, cabina e iluminación',
             priceLabel: 'Desde \$6,500 MXN',
             unitPriceCents: 650000,
             badge: 'Party',
@@ -296,18 +298,18 @@ class ClientServiceCatalog {
         ClientServiceCategory.decoration: <ClientServiceItem>[
           ClientServiceItem(
             id: 'deco-romance',
-            name: 'Decoracion Romance',
+            name: 'Decoración Romance',
             subtitle: 'Montaje floral y mesa principal',
             priceLabel: 'Desde \$9,900 MXN',
             unitPriceCents: 990000,
-            badge: 'Romantico',
+            badge: 'Romántico',
           ),
         ],
         ClientServiceCategory.photography: <ClientServiceItem>[
           ClientServiceItem(
             id: 'photo-cinema',
             name: 'Cobertura Foto y Video',
-            subtitle: 'Sesion, teaser y entrega digital',
+            subtitle: 'Sesión, teaser y entrega digital',
             priceLabel: 'Desde \$13,500 MXN',
             unitPriceCents: 1350000,
             badge: 'Cinema',

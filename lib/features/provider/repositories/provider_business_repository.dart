@@ -37,7 +37,7 @@ class ProviderBusinessRepository {
   static String mapApiError(Object error) {
     if (error is DioException) {
       if (error.response?.statusCode == 413) {
-        return 'La imagen es demasiado pesada. Intenta con una foto mas ligera.';
+        return 'La imagen es demasiado pesada. Intenta con una foto más ligera.';
       }
 
       final dynamic data = error.response?.data;

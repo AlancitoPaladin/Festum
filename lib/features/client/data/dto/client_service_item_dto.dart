@@ -13,6 +13,7 @@ class ClientServiceItemDto {
     required this.products,
     required this.imageKey,
     required this.imageUrl,
+    required this.galleryImageUrls,
     this.imageExpiresAt,
     this.shortTitle,
     this.shortSubtitle,
@@ -28,11 +29,16 @@ class ClientServiceItemDto {
   final List<ClientServiceProductDto> products;
   final String imageKey;
   final String imageUrl;
+  final List<String> galleryImageUrls;
   final DateTime? imageExpiresAt;
   final String? shortTitle;
   final String? shortSubtitle;
 
-  factory ClientServiceItemDto.fromJson(Map<String, dynamic> json) {
+  factory ClientServiceItemDto.fromJson(
+    Map<String, dynamic> json, {
+    ResolvedImageUseCase imageUseCase = ResolvedImageUseCase.detail,
+    ResolvedImageUseCase productImageUseCase = ResolvedImageUseCase.list,
+  }) {
     final String rawName = _readFirstString(json, const <String>[
       'name',
       'title',
@@ -81,8 +87,9 @@ class ClientServiceItemDto {
     final String imageKey = (imagePayload?['key'] ?? json['image_key'] ?? '')
         .toString()
         .trim();
-    final String imageUrl = resolveImageUrlFromJson(
+    final String imageUrl = resolveImageUrlForUseCaseFromJson(
       json,
+      useCase: imageUseCase,
       directKeys: const <String>[
         'main_image_url',
         'image_url',
@@ -93,6 +100,15 @@ class ClientServiceItemDto {
       objectKeys: const <String>['main_image', 'image', 'asset'],
       listKeys: const <String>['images', 'image_urls'],
     );
+    final List<String> rawGalleryImageUrls = resolveImageUrlsForUseCaseFromJson(
+      json,
+      useCase: imageUseCase,
+      listKeys: const <String>['images', 'image_urls'],
+    );
+    final List<String> galleryImageUrls = <String>{
+      if (imageUrl.isNotEmpty) imageUrl,
+      ...rawGalleryImageUrls,
+    }.toList();
     final DateTime? imageExpiresAt = _parseDate(
       imagePayload?['expires_at'] ??
           imagePayload?['expiresAt'] ??
@@ -115,11 +131,13 @@ class ClientServiceItemDto {
           .map(
             (Map<dynamic, dynamic> item) => ClientServiceProductDto.fromJson(
               Map<String, dynamic>.from(item),
+              imageUseCase: productImageUseCase,
             ),
           )
           .toList()),
       imageKey: imageKey,
       imageUrl: imageUrl,
+      galleryImageUrls: galleryImageUrls,
       imageExpiresAt: imageExpiresAt,
       shortTitle: json['short_title'] as String?,
       shortSubtitle: json['short_subtitle'] as String?,
@@ -145,6 +163,7 @@ class ClientServiceItemDto {
           'expires_at': imageExpiresAt!.toIso8601String(),
       },
       'image_url': imageUrl,
+      'image_urls': galleryImageUrls,
       if (shortTitle != null) 'short_title': shortTitle,
       if (shortSubtitle != null) 'short_subtitle': shortSubtitle,
     };
@@ -164,6 +183,7 @@ class ClientServiceItemDto {
           .toList(),
       imageKey: imageKey,
       imageUrl: imageUrl,
+      galleryImageUrls: galleryImageUrls,
       imageExpiresAt: imageExpiresAt,
       displayNameShort: shortTitle,
       displaySubtitleShort: shortSubtitle,
@@ -274,15 +294,19 @@ class ClientServiceProductDto {
   final String imageUrl;
   final DateTime? imageExpiresAt;
 
-  factory ClientServiceProductDto.fromJson(Map<String, dynamic> json) {
+  factory ClientServiceProductDto.fromJson(
+    Map<String, dynamic> json, {
+    ResolvedImageUseCase imageUseCase = ResolvedImageUseCase.list,
+  }) {
     final Map<String, dynamic>? imagePayload = ClientServiceItemDto._asMap(
       json['image'],
     );
     final String imageKey = (imagePayload?['key'] ?? json['image_key'] ?? '')
         .toString()
         .trim();
-    final String imageUrl = resolveImageUrlFromJson(
+    final String imageUrl = resolveImageUrlForUseCaseFromJson(
       json,
+      useCase: imageUseCase,
       directKeys: const <String>['main_image_url', 'image_url', 'url'],
       objectKeys: const <String>['main_image', 'image'],
       listKeys: const <String>['images', 'image_urls'],

@@ -35,14 +35,21 @@ class ClientFeedback {
     required String message,
     String? actionLabel,
     VoidCallback? onAction,
+    Duration? duration,
   }) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
+    final bool hasAction = actionLabel != null && onAction != null;
     messenger.showSnackBar(
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,
-        action: (actionLabel != null && onAction != null)
+        duration:
+            duration ??
+            (hasAction
+                ? const Duration(seconds: 5)
+                : const Duration(seconds: 3)),
+        action: hasAction
             ? SnackBarAction(label: actionLabel, onPressed: onAction)
             : null,
       ),

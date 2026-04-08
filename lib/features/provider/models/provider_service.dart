@@ -69,9 +69,11 @@ class ProviderService {
     final String imageUrl = sanitizeAssetUrl(
       mainImage?.resolvedImageUrl.isNotEmpty == true
           ? mainImage!.resolvedImageUrl
-          : (image?.url.trim().isNotEmpty == true
-                ? image!.url
-                : legacyImageUrl),
+          : image?.urlForUseCase(
+                  ResolvedImageUseCase.list,
+                  fallback: legacyImageUrl,
+                ) ??
+                legacyImageUrl,
     );
     return imageUrl;
   }

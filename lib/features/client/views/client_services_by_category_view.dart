@@ -4,13 +4,13 @@ import 'package:festum/core/network/api_error_mapper.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/app_remote_image.dart';
 import 'package:festum/features/client/models/client_cart_item.dart';
-import 'package:festum/features/client/models/client_order_item.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
 import 'package:festum/features/client/models/client_tab.dart';
+import 'package:festum/features/client/services/client_query_cache_service.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
 import 'package:festum/features/client/usecases/add_service_to_cart_use_case.dart';
+import 'package:festum/features/client/usecases/get_client_active_order_service_ids_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_cart_items_use_case.dart';
-import 'package:festum/features/client/usecases/get_client_orders_use_case.dart';
 import 'package:festum/features/client/usecases/get_services_by_category_use_case.dart';
 import 'package:festum/features/client/widgets/client_feedback.dart';
 import 'package:festum/features/client/widgets/client_shell_scaffold.dart';
@@ -34,7 +34,8 @@ class _ClientServicesByCategoryViewState
     extends State<ClientServicesByCategoryView> {
   late final GetServicesByCategoryUseCase _getServicesByCategoryUseCase;
   late final GetClientCartItemsUseCase _getClientCartItemsUseCase;
-  late final GetClientOrdersUseCase _getClientOrdersUseCase;
+  late final GetClientActiveOrderServiceIdsUseCase
+  _getClientActiveOrderServiceIdsUseCase;
   late final AddServiceToCartUseCase _addServiceToCartUseCase;
   late final ClientTabUiStateService _tabUiStateService;
 
@@ -53,7 +54,8 @@ class _ClientServicesByCategoryViewState
     super.initState();
     _getServicesByCategoryUseCase = locator<GetServicesByCategoryUseCase>();
     _getClientCartItemsUseCase = locator<GetClientCartItemsUseCase>();
-    _getClientOrdersUseCase = locator<GetClientOrdersUseCase>();
+    _getClientActiveOrderServiceIdsUseCase =
+        locator<GetClientActiveOrderServiceIdsUseCase>();
     _addServiceToCartUseCase = locator<AddServiceToCartUseCase>();
     _tabUiStateService = locator<ClientTabUiStateService>();
     _loadServices(showLoader: true);
@@ -99,22 +101,14 @@ class _ClientServicesByCategoryViewState
       return;
     }
     _didRefreshAfterImage403 = true;
+    locator<ClientQueryCacheService>().invalidatePrefix('client_services/');
     await _loadServices(showLoader: false);
   }
 
   Future<void> _syncClientLocks() async {
     final List<ClientCartItem> cartItems = await _getClientCartItemsUseCase();
-    final List<ClientOrderItem> orders = await _getClientOrdersUseCase();
-    final Set<String> activeOrderServiceIds = orders
-        .where(
-          (ClientOrderItem order) =>
-              order.status != ClientOrderStatus.cancelled &&
-              order.status != ClientOrderStatus.completed,
-        )
-        .expand((ClientOrderItem order) => order.items)
-        .map((item) => item.serviceId.trim())
-        .where((String serviceId) => serviceId.isNotEmpty)
-        .toSet();
+    final Set<String> activeOrderServiceIds =
+        await _getClientActiveOrderServiceIdsUseCase();
     if (!mounted) {
       return;
     }

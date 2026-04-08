@@ -2,7 +2,9 @@ import 'package:festum/features/client/models/client_order_item.dart';
 import 'package:festum/features/client/models/client_cart_item.dart';
 
 abstract class ClientOrdersRepository {
-  Future<List<ClientOrderItem>> getOrders();
+  Future<List<ClientOrderItem>> getOrders({bool includeItems = false});
+  Future<ClientOrderItem?> getOrderById(String orderId);
+  Future<Set<String>> getActiveServiceIds();
 
   Future<ClientOrderItem> createOrder({
     required String title,

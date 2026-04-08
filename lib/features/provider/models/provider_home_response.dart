@@ -22,8 +22,9 @@ class ProviderHomeResponse {
       providerId: (json['provider_id'] ?? '').toString(),
       displayName: (json['display_name'] ?? '').toString(),
       businessName: (json['business_name'] ?? '').toString(),
-      avatarUrl: resolveImageUrlFromJson(
+      avatarUrl: resolveImageUrlForUseCaseFromJson(
         json,
+        useCase: ResolvedImageUseCase.list,
         directKeys: const <String>['avatar_url', 'image_url', 'url'],
         objectKeys: const <String>['avatar', 'image'],
         listKeys: const <String>['images'],
@@ -110,8 +111,9 @@ class ProviderFeaturedService {
       status: (json['status'] ?? '').toString(),
       priceLabel: (json['price_label'] ?? '').toString(),
       reservations: _toInt(json['reservations']),
-      imageUrl: resolveImageUrlFromJson(
+      imageUrl: resolveImageUrlForUseCaseFromJson(
         json,
+        useCase: ResolvedImageUseCase.list,
         directKeys: const <String>[
           'main_image_url',
           'image_url',

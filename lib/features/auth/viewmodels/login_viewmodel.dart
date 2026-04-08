@@ -46,7 +46,6 @@ class LoginViewModel extends BaseViewModel {
         password: passwordController.text,
       );
 
-      await _providerBusinessInfoStateService.resetBusinessInfoProgress();
       await _providerBrandingService.clear();
       await _providerReactivityService.clear();
       await _authStateService.signIn(
@@ -76,8 +75,8 @@ class LoginViewModel extends BaseViewModel {
 
   Future<void> _syncProviderBusinessInfoProgress() async {
     try {
-      final ProviderBusinessProfile profile =
-          await _providerBusinessRepository.fetchProfile();
+      final ProviderBusinessProfile profile = await _providerBusinessRepository
+          .fetchProfile();
       final bool hasCompletedBusinessInfo =
           profile.businessName.trim().isNotEmpty ||
           profile.location.trim().isNotEmpty ||

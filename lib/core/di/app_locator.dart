@@ -20,16 +20,16 @@ import 'package:festum/features/client/repositories/api/api_client_availability_
 import 'package:festum/features/client/repositories/api/api_client_cart_repository.dart';
 import 'package:festum/features/client/repositories/api/api_client_orders_repository.dart';
 import 'package:festum/features/client/repositories/api/api_client_services_repository.dart';
-import 'package:festum/features/client/repositories/mock/mock_client_availability_repository.dart';
-import 'package:festum/features/client/repositories/mock/mock_client_cart_repository.dart';
-import 'package:festum/features/client/repositories/mock/mock_client_orders_repository.dart';
-import 'package:festum/features/client/repositories/mock/mock_client_services_repository.dart';
+import 'package:festum/features/client/services/client_query_cache_service.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
 import 'package:festum/features/client/usecases/add_service_to_cart_use_case.dart';
 import 'package:festum/features/client/usecases/checkout_cart_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_cart_items_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_home_sections_use_case.dart';
+import 'package:festum/features/client/usecases/get_client_order_by_id_use_case.dart';
+import 'package:festum/features/client/usecases/get_client_active_order_service_ids_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_orders_use_case.dart';
+import 'package:festum/features/client/usecases/get_client_home_bootstrap_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_product_availability_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_service_by_id_use_case.dart';
 import 'package:festum/features/client/usecases/get_services_by_category_use_case.dart';
@@ -124,7 +124,12 @@ Future<void> setupLocator() async {
 
     if (kDebugMode) {
       dio.interceptors.add(
-        LogInterceptor(requestBody: true, responseBody: true),
+        LogInterceptor(
+          requestBody: true,
+          responseBody: true,
+          requestHeader: false,
+          responseHeader: false,
+        ),
       );
     }
 
@@ -314,37 +319,37 @@ Future<void> setupLocator() async {
     ),
   );
   locator.registerLazySingleton<ImagePicker>(ImagePicker.new);
+  locator.registerLazySingleton<ClientQueryCacheService>(
+    ClientQueryCacheService.new,
+  );
 
-  if (AppEnvironment.useClientMocks) {
-    locator.registerLazySingleton<ClientAvailabilityRepository>(
-      MockClientAvailabilityRepository.new,
-    );
-    locator.registerLazySingleton<ClientServicesRepository>(
-      MockClientServicesRepository.new,
-    );
-    locator.registerLazySingleton<ClientOrdersRepository>(
-      MockClientOrdersRepository.new,
-    );
-    locator.registerLazySingleton<ClientCartRepository>(
-      MockClientCartRepository.new,
-    );
-  } else {
-    locator.registerLazySingleton<ClientAvailabilityRepository>(
-      () => ApiClientAvailabilityRepository(locator<ApiClient>()),
-    );
-    locator.registerLazySingleton<ClientServicesRepository>(
-      () => ApiClientServicesRepository(locator<ApiClient>()),
-    );
-    locator.registerLazySingleton<ClientOrdersRepository>(
-      () => ApiClientOrdersRepository(locator<ApiClient>()),
-    );
-    locator.registerLazySingleton<ClientCartRepository>(
-      () => ApiClientCartRepository(locator<ApiClient>()),
-    );
-  }
+  locator.registerLazySingleton<ClientAvailabilityRepository>(
+    () => ApiClientAvailabilityRepository(locator<ApiClient>()),
+  );
+  locator.registerLazySingleton<ClientServicesRepository>(
+    () => ApiClientServicesRepository(
+      locator<ApiClient>(),
+      locator<ClientQueryCacheService>(),
+    ),
+  );
+  locator.registerLazySingleton<ClientOrdersRepository>(
+    () => ApiClientOrdersRepository(
+      locator<ApiClient>(),
+      locator<ClientQueryCacheService>(),
+    ),
+  );
+  locator.registerLazySingleton<ClientCartRepository>(
+    () => ApiClientCartRepository(
+      locator<ApiClient>(),
+      locator<ClientQueryCacheService>(),
+    ),
+  );
 
   locator.registerLazySingleton<GetClientHomeSectionsUseCase>(
     () => GetClientHomeSectionsUseCase(locator<ClientServicesRepository>()),
+  );
+  locator.registerLazySingleton<GetClientHomeBootstrapUseCase>(
+    () => GetClientHomeBootstrapUseCase(locator<ClientServicesRepository>()),
   );
   locator.registerLazySingleton<GetServicesByCategoryUseCase>(
     () => GetServicesByCategoryUseCase(locator<ClientServicesRepository>()),
@@ -359,6 +364,14 @@ Future<void> setupLocator() async {
   );
   locator.registerLazySingleton<GetClientOrdersUseCase>(
     () => GetClientOrdersUseCase(locator<ClientOrdersRepository>()),
+  );
+  locator.registerLazySingleton<GetClientOrderByIdUseCase>(
+    () => GetClientOrderByIdUseCase(locator<ClientOrdersRepository>()),
+  );
+  locator.registerLazySingleton<GetClientActiveOrderServiceIdsUseCase>(
+    () => GetClientActiveOrderServiceIdsUseCase(
+      locator<ClientOrdersRepository>(),
+    ),
   );
   locator.registerLazySingleton<UpdateClientOrderStatusUseCase>(
     () => UpdateClientOrderStatusUseCase(locator<ClientOrdersRepository>()),

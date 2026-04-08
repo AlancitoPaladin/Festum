@@ -5,12 +5,12 @@ import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/network/api_error_mapper.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/app_remote_image.dart';
-import 'package:festum/features/client/models/client_order_item.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
 import 'package:festum/features/client/models/client_tab.dart';
+import 'package:festum/features/client/services/client_query_cache_service.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
 import 'package:festum/features/client/usecases/add_service_to_cart_use_case.dart';
-import 'package:festum/features/client/usecases/get_client_orders_use_case.dart';
+import 'package:festum/features/client/usecases/get_client_active_order_service_ids_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_service_by_id_use_case.dart';
 import 'package:festum/features/client/usecases/is_service_in_cart_use_case.dart';
 import 'package:festum/features/client/widgets/client_feedback.dart';
@@ -37,7 +37,8 @@ class ClientServiceDetailView extends StatefulWidget {
 
 class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
   late final GetClientServiceByIdUseCase _getClientServiceByIdUseCase;
-  late final GetClientOrdersUseCase _getClientOrdersUseCase;
+  late final GetClientActiveOrderServiceIdsUseCase
+  _getClientActiveOrderServiceIdsUseCase;
   late final AddServiceToCartUseCase _addServiceToCartUseCase;
   late final IsServiceInCartUseCase _isServiceInCartUseCase;
 
@@ -54,7 +55,8 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
   void initState() {
     super.initState();
     _getClientServiceByIdUseCase = locator<GetClientServiceByIdUseCase>();
-    _getClientOrdersUseCase = locator<GetClientOrdersUseCase>();
+    _getClientActiveOrderServiceIdsUseCase =
+        locator<GetClientActiveOrderServiceIdsUseCase>();
     _addServiceToCartUseCase = locator<AddServiceToCartUseCase>();
     _isServiceInCartUseCase = locator<IsServiceInCartUseCase>();
     _loadDetail(showLoader: true);
@@ -88,21 +90,14 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
         _didRefreshAfterImage403 = false;
         _selectedProductIds = <String>{};
       });
-      final List<dynamic> lockSnapshot = await Future.wait<dynamic>(<Future<dynamic>>[
-        _isServiceInCartUseCase(result.id),
-        _getClientOrdersUseCase(),
-      ]);
+      final List<dynamic> lockSnapshot =
+          await Future.wait<dynamic>(<Future<dynamic>>[
+            _isServiceInCartUseCase(result.id),
+            _getClientActiveOrderServiceIdsUseCase(),
+          ]);
       final bool isInCart = lockSnapshot[0] as bool;
-      final List<ClientOrderItem> orders =
-          lockSnapshot[1] as List<ClientOrderItem>;
-      final bool isBlockedByActiveOrder = orders
-          .where(
-            (ClientOrderItem order) =>
-                order.status != ClientOrderStatus.cancelled &&
-                order.status != ClientOrderStatus.completed,
-          )
-          .expand((ClientOrderItem order) => order.items)
-          .any((ClientOrderLineItem item) => item.serviceId == result.id);
+      final Set<String> activeServiceIds = lockSnapshot[1] as Set<String>;
+      final bool isBlockedByActiveOrder = activeServiceIds.contains(result.id);
       if (!mounted) {
         return;
       }
@@ -129,6 +124,7 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
       return;
     }
     _didRefreshAfterImage403 = true;
+    locator<ClientQueryCacheService>().invalidatePrefix('client_services/');
     await _loadDetail(showLoader: false);
   }
 
@@ -388,14 +384,49 @@ class _ClientServiceDetailViewState extends State<ClientServiceDetailView> {
   }
 }
 
-class _HeroGallery extends StatelessWidget {
+class _HeroGallery extends StatefulWidget {
   const _HeroGallery({required this.service, required this.onForbiddenImage});
 
   final ClientServiceItem service;
   final Future<void> Function() onForbiddenImage;
 
   @override
+  State<_HeroGallery> createState() => _HeroGalleryState();
+}
+
+class _HeroGalleryState extends State<_HeroGallery> {
+  int _selectedImageIndex = 0;
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  List<String> get _galleryUrls {
+    final Set<String> deduped = <String>{
+      ...widget.service.galleryImageUrls
+          .map((String value) => value.trim())
+          .where((String value) => value.isNotEmpty),
+      widget.service.imageUrl.trim(),
+    }..removeWhere((String value) => value.isEmpty);
+    return deduped.toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final List<String> galleryUrls = _galleryUrls;
+    final String previewUrl = galleryUrls.isEmpty
+        ? widget.service.imageUrl
+        : galleryUrls[_selectedImageIndex.clamp(0, galleryUrls.length - 1)];
+
     return Column(
       children: <Widget>[
         ClipRRect(
@@ -405,28 +436,43 @@ class _HeroGallery extends StatelessWidget {
             child: Stack(
               children: <Widget>[
                 Positioned.fill(
-                  child: AppRemoteImage(
-                    imageUrl: service.imageUrl,
-                    fit: BoxFit.cover,
-                    onForbidden: onForbiddenImage,
-                    placeholder: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: <Color>[
-                            AppColors.appBar,
-                            AppColors.secondaryButton,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: galleryUrls.isEmpty ? 1 : galleryUrls.length,
+                    onPageChanged: (int index) {
+                      if (!mounted) {
+                        return;
+                      }
+                      setState(() => _selectedImageIndex = index);
+                    },
+                    itemBuilder: (BuildContext context, int index) {
+                      final String pageImageUrl = galleryUrls.isEmpty
+                          ? previewUrl
+                          : galleryUrls[index];
+                      return AppRemoteImage(
+                        imageUrl: pageImageUrl,
+                        fit: BoxFit.cover,
+                        onForbidden: widget.onForbiddenImage,
+                        placeholder: Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: <Color>[
+                                AppColors.appBar,
+                                AppColors.secondaryButton,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.photo_library_rounded,
+                            color: AppColors.appBarText.withValues(alpha: 0.8),
+                            size: 56,
+                          ),
                         ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.photo_library_rounded,
-                        color: AppColors.appBarText.withValues(alpha: 0.8),
-                        size: 56,
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
                 Positioned.fill(
@@ -447,10 +493,10 @@ class _HeroGallery extends StatelessWidget {
                   right: 16,
                   top: 16,
                   child: Hero(
-                    tag: 'client-service-badge-${service.id}',
+                    tag: 'client-service-badge-${widget.service.id}',
                     child: Material(
                       type: MaterialType.transparency,
-                      child: _Badge(label: service.resolvedBadge),
+                      child: _Badge(label: widget.service.resolvedBadge),
                     ),
                   ),
                 ),
@@ -474,27 +520,55 @@ class _HeroGallery extends StatelessWidget {
           height: 64,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: 5,
+            itemCount: galleryUrls.isEmpty ? 1 : galleryUrls.length,
             separatorBuilder: (_, _) => const SizedBox(width: 10),
             itemBuilder: (BuildContext context, int index) {
+              final bool isSelected = index == _selectedImageIndex;
+              final String imageUrl = galleryUrls.isEmpty
+                  ? widget.service.imageUrl
+                  : galleryUrls[index];
               return SizedBox(
                 width: 86,
-                child: AppRemoteImage(
-                  imageUrl: service.imageUrl,
-                  fit: BoxFit.cover,
-                  borderRadius: BorderRadius.circular(16),
-                  onForbidden: onForbiddenImage,
-                  placeholder: Container(
+                child: GestureDetector(
+                  onTap: () {
+                    if (galleryUrls.isEmpty) {
+                      return;
+                    }
+                    setState(() => _selectedImageIndex = index);
+                    _pageController.animateToPage(
+                      index,
+                      duration: const Duration(milliseconds: 240),
+                      curve: Curves.easeOutCubic,
+                    );
+                  },
+                  child: DecoratedBox(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
-                      color: AppColors.cardAccent,
                       border: Border.all(
-                        color: AppColors.outline.withValues(alpha: 0.3),
+                        color: isSelected
+                            ? AppColors.activeIcon
+                            : AppColors.outline.withValues(alpha: 0.3),
+                        width: isSelected ? 1.8 : 1,
                       ),
                     ),
-                    child: Icon(
-                      Icons.image_outlined,
-                      color: AppColors.secondaryText,
+                    child: AppRemoteImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      borderRadius: BorderRadius.circular(16),
+                      onForbidden: widget.onForbiddenImage,
+                      placeholder: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: AppColors.cardAccent,
+                          border: Border.all(
+                            color: AppColors.outline.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.image_outlined,
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -710,7 +784,7 @@ class _ProductOptionCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       product.description.trim().isEmpty
-                          ? 'Sin descripcion disponible.'
+                          ? 'Sin descripción disponible.'
                           : product.description,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),

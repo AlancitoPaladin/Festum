@@ -15,13 +15,13 @@ enum ServiceCategory {
   String get providerApiValue {
     switch (this) {
       case ServiceCategory.venue:
-        return 'venue';
+        return 'salones-sociales';
       case ServiceCategory.furniture:
-        return 'furniture';
+        return 'mobiliario';
       case ServiceCategory.equipment:
-        return 'equipment';
+        return 'mobiliario';
       case ServiceCategory.banquet:
-        return 'banquet';
+        return 'banquetes';
       case ServiceCategory.dj:
         return 'dj';
       case ServiceCategory.decoration:

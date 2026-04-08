@@ -33,7 +33,9 @@ class ManualBookingViewModel extends BaseViewModel {
     contactEmailController.text = initialBooking?.contactEmail ?? '';
     eventLocationController.text = initialBooking?.eventLocation ?? '';
     notesController.text = initialBooking?.notes ?? '';
-    totalAmountController.text = _initialTextAmount(initialBooking?.totalAmount);
+    totalAmountController.text = _initialTextAmount(
+      initialBooking?.totalAmount,
+    );
     paidAmountController.text = _initialTextAmount(initialBooking?.paidAmount);
     hasSpecificSchedule = _hasSchedule(initialBooking);
     startTime = _readStartTime(initialBooking?.time);
@@ -72,7 +74,7 @@ class ManualBookingViewModel extends BaseViewModel {
       isEditMode ? 'Guardar cambios' : 'Confirmar reserva';
 
   String get introText => isEditMode
-      ? 'Actualiza la informacion de la reserva sin cambiar la experiencia visual del flujo actual.'
+      ? 'Actualiza la información de la reserva sin cambiar la experiencia visual del flujo actual.'
       : 'Registra una reserva externa para bloquear la fecha en tu calendario.';
 
   double get totalAmount => _parseAmount(totalAmountController.text);

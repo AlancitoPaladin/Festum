@@ -17,12 +17,15 @@ class ClientTabUiStateService extends ChangeNotifier {
   final Map<ClientTab, double> _scrollOffsets = <ClientTab, double>{};
   final Map<String, ClientOrderStatus> _lastKnownOrderStatuses =
       <String, ClientOrderStatus>{};
+  List<ClientOrderItem> _lastOrdersSnapshot = <ClientOrderItem>[];
+  DateTime? _lastOrdersSyncedAt;
   final List<ClientInAppNotification> _notifications =
       <ClientInAppNotification>[];
 
   int _cartCount = 0;
   int _ordersCount = 0;
   int _orderNotificationsCount = 0;
+  bool _homeDataReady = false;
 
   double scrollOffsetFor(ClientTab tab) {
     return _scrollOffsets[tab] ?? 0;
@@ -44,8 +47,17 @@ class ClientTabUiStateService extends ChangeNotifier {
   }
 
   int get orderNotificationsCount => _orderNotificationsCount;
+  bool get homeDataReady => _homeDataReady;
   List<ClientInAppNotification> get notifications =>
       List<ClientInAppNotification>.unmodifiable(_notifications);
+
+  void markHomeDataReady() {
+    if (_homeDataReady) {
+      return;
+    }
+    _homeDataReady = true;
+    notifyListeners();
+  }
 
   void setCartCount(int value) {
     final int next = value < 0 ? 0 : value;
@@ -158,6 +170,9 @@ class ClientTabUiStateService extends ChangeNotifier {
   }
 
   void ingestOrders(List<ClientOrderItem> orders) {
+    _lastOrdersSnapshot = List<ClientOrderItem>.unmodifiable(orders);
+    _lastOrdersSyncedAt = DateTime.now();
+
     bool changed = false;
     for (final ClientOrderItem order in orders) {
       final ClientOrderStatus? previous = _lastKnownOrderStatuses[order.id];
@@ -212,6 +227,17 @@ class ClientTabUiStateService extends ChangeNotifier {
     _recomputeUnreadCounter();
     _persistNotifications();
     notifyListeners();
+  }
+
+  List<ClientOrderItem>? recentOrdersSnapshot({required Duration maxAge}) {
+    final DateTime? syncedAt = _lastOrdersSyncedAt;
+    if (syncedAt == null) {
+      return null;
+    }
+    if (DateTime.now().difference(syncedAt) > maxAge) {
+      return null;
+    }
+    return _lastOrdersSnapshot;
   }
 
   void _recomputeUnreadCounter() {

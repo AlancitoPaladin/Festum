@@ -17,7 +17,11 @@ class ProviderServiceImage {
 
   String get resolvedImageUrl {
     return sanitizeAssetUrl(
-      asset?.url.trim().isNotEmpty == true ? asset!.url : legacyImageUrl,
+      asset?.urlForUseCase(
+            ResolvedImageUseCase.list,
+            fallback: legacyImageUrl,
+          ) ??
+          legacyImageUrl,
     );
   }
 
@@ -55,18 +59,17 @@ class ProviderServiceImage {
             .toString()
             .trim();
 
-    final String legacyImageUrl =
-        resolveImageUrlFromJson(
-          json,
-          directKeys: const <String>[
-            'main_image_url',
-            'image_url',
-            'url',
-            'asset_url',
-          ],
-          objectKeys: const <String>['main_image', 'image', 'asset'],
-          listKeys: const <String>['images', 'image_urls'],
-        );
+    final String legacyImageUrl = resolveImageUrlFromJson(
+      json,
+      directKeys: const <String>[
+        'main_image_url',
+        'image_url',
+        'url',
+        'asset_url',
+      ],
+      objectKeys: const <String>['main_image', 'image', 'asset'],
+      listKeys: const <String>['images', 'image_urls'],
+    );
 
     return ProviderServiceImage(
       key: key,
@@ -87,13 +90,12 @@ class ProviderServiceImage {
   }
 
   static ProviderSignedAsset? _fallbackAsset(Map<String, dynamic> json) {
-    final ProviderSignedAsset asset = ProviderSignedAsset.fromJson(
-      <String, dynamic>{
-        'key': (json['key'] ?? json['image_key'] ?? '').toString(),
-        'url': (json['image_url'] ?? json['url'] ?? '').toString(),
-        'expires_at': json['expires_at'] ?? json['expiresAt'],
-      },
-    );
+    final ProviderSignedAsset asset =
+        ProviderSignedAsset.fromJson(<String, dynamic>{
+          'key': (json['key'] ?? json['image_key'] ?? '').toString(),
+          'url': (json['image_url'] ?? json['url'] ?? '').toString(),
+          'expires_at': json['expires_at'] ?? json['expiresAt'],
+        });
     if (asset.key.isEmpty && !asset.hasUrl) {
       return null;
     }

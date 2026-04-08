@@ -8,10 +8,6 @@ class AppEnvironment {
   );
 
   static const String _productionApiBaseUrl = 'http://18.219.37.43';
-  static const bool _useClientMocksFromDefine = bool.fromEnvironment(
-    'USE_CLIENT_MOCKS',
-    defaultValue: false,
-  );
 
   static String get apiBaseUrl {
     if (_apiBaseUrlFromDefine.isNotEmpty) {
@@ -30,6 +26,4 @@ class AppEnvironment {
     // iOS simulator y desktop pueden usar loopback directo.
     return 'http://127.0.0.1:8000';
   }
-
-  static bool get useClientMocks => _useClientMocksFromDefine;
 }

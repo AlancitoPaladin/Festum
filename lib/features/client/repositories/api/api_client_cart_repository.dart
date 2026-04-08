@@ -3,21 +3,32 @@ import 'package:festum/core/network/api_client.dart';
 import 'package:festum/features/client/data/dto/client_cart_item_dto.dart';
 import 'package:festum/features/client/models/client_cart_item.dart';
 import 'package:festum/features/client/repositories/client_cart_repository.dart';
+import 'package:festum/features/client/services/client_query_cache_service.dart';
 
 class ApiClientCartRepository implements ClientCartRepository {
-  ApiClientCartRepository(this._apiClient);
+  ApiClientCartRepository(this._apiClient, this._cache);
 
   final ApiClient _apiClient;
+  final ClientQueryCacheService _cache;
+
+  static const String _cartItemsCacheKey = 'client_cart/items';
+  static const Duration _cartTtl = Duration(seconds: 4);
 
   @override
   Future<List<ClientCartItem>> getCartItems() async {
     try {
-      final List<Map<String, dynamic>> payload = await _apiClient
-          .getClientCartItems();
-      return payload
-          .map(ClientCartItemDto.fromJson)
-          .map((ClientCartItemDto dto) => dto.toDomain())
-          .toList();
+      return _cache.getOrLoad<List<ClientCartItem>>(
+        key: _cartItemsCacheKey,
+        ttl: _cartTtl,
+        loader: () async {
+          final List<Map<String, dynamic>> payload = await _apiClient
+              .getClientCartItems();
+          return payload
+              .map(ClientCartItemDto.fromJson)
+              .map((ClientCartItemDto dto) => dto.toDomain())
+              .toList();
+        },
+      );
     } on DioException {
       rethrow;
     } on FormatException {
@@ -26,7 +37,12 @@ class ApiClientCartRepository implements ClientCartRepository {
   }
 
   @override
-  Future<bool> containsService(String serviceId) {
+  Future<bool> containsService(String serviceId) async {
+    final List<ClientCartItem>? cached = _cache
+        .getIfFresh<List<ClientCartItem>>(_cartItemsCacheKey);
+    if (cached != null) {
+      return cached.any((ClientCartItem item) => item.id == serviceId);
+    }
     return _apiClient.containsServiceInClientCart(serviceId: serviceId);
   }
 
@@ -40,7 +56,7 @@ class ApiClientCartRepository implements ClientCartRepository {
     List<String>? selectedProductIds,
   }) async {
     try {
-      return await _apiClient.addServiceToClientCart(
+      final bool added = await _apiClient.addServiceToClientCart(
         serviceId: serviceId,
         name: name,
         unitPriceCents: unitPriceCents,
@@ -48,20 +64,25 @@ class ApiClientCartRepository implements ClientCartRepository {
         productName: productName,
         selectedProductIds: selectedProductIds,
       );
+      _cache.invalidate(_cartItemsCacheKey);
+      return added;
     } on DioException catch (error) {
       if (error.response?.statusCode == 422 &&
           selectedProductIds != null &&
           selectedProductIds.isNotEmpty) {
-        return _apiClient.addServiceToClientCart(
+        final bool added = await _apiClient.addServiceToClientCart(
           serviceId: serviceId,
           name: name,
           unitPriceCents: unitPriceCents,
           productId: productId,
           productName: productName,
         );
+        _cache.invalidate(_cartItemsCacheKey);
+        return added;
       }
       // Duplicate service in cart should be a controlled UI case, not a hard failure.
       if (error.response?.statusCode == 409) {
+        _cache.invalidate(_cartItemsCacheKey);
         return false;
       }
       rethrow;
@@ -73,6 +94,7 @@ class ApiClientCartRepository implements ClientCartRepository {
     final Map<String, dynamic>? payload = await _apiClient.removeClientCartItem(
       id: id,
     );
+    _cache.invalidate(_cartItemsCacheKey);
     if (payload == null) {
       return null;
     }
@@ -81,6 +103,7 @@ class ApiClientCartRepository implements ClientCartRepository {
 
   @override
   Future<void> restoreItem({required ClientCartItem item, required int index}) {
+    _cache.invalidate(_cartItemsCacheKey);
     return _apiClient.restoreClientCartItem(
       item: ClientCartItemDto.fromDomain(item).toJson(),
       index: index,
@@ -89,6 +112,7 @@ class ApiClientCartRepository implements ClientCartRepository {
 
   @override
   Future<void> clear() {
+    _cache.invalidate(_cartItemsCacheKey);
     return _apiClient.clearClientCart();
   }
 }

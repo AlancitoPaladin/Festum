@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:festum/app/router/app_routes.dart';
 import 'package:festum/core/di/app_locator.dart';
 import 'package:festum/core/network/api_error_mapper.dart';
@@ -6,14 +8,15 @@ import 'package:festum/core/services/auth_state_service.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/core/widgets/app_remote_image.dart';
 import 'package:festum/features/client/models/client_cart_item.dart';
-import 'package:festum/features/client/models/client_order_item.dart';
 import 'package:festum/features/client/models/client_service_catalog.dart';
 import 'package:festum/features/client/models/client_tab.dart';
+import 'package:festum/features/client/services/client_query_cache_service.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
 import 'package:festum/features/client/usecases/add_service_to_cart_use_case.dart';
+import 'package:festum/features/client/usecases/get_client_active_order_service_ids_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_cart_items_use_case.dart';
+import 'package:festum/features/client/usecases/get_client_home_bootstrap_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_home_sections_use_case.dart';
-import 'package:festum/features/client/usecases/get_client_orders_use_case.dart';
 import 'package:festum/features/client/widgets/client_feedback.dart';
 import 'package:festum/features/client/widgets/client_shell_scaffold.dart';
 import 'package:festum/features/client/widgets/client_status_view.dart';
@@ -32,9 +35,11 @@ class ClientHomeView extends StatefulWidget {
 }
 
 class _ClientHomeViewState extends State<ClientHomeView> {
+  late final GetClientHomeBootstrapUseCase _getClientHomeBootstrapUseCase;
   late final GetClientHomeSectionsUseCase _getClientHomeSectionsUseCase;
   late final GetClientCartItemsUseCase _getClientCartItemsUseCase;
-  late final GetClientOrdersUseCase _getClientOrdersUseCase;
+  late final GetClientActiveOrderServiceIdsUseCase
+  _getClientActiveOrderServiceIdsUseCase;
   late final AddServiceToCartUseCase _addServiceToCartUseCase;
   late final ClientTabUiStateService _tabUiStateService;
   late final ScrollController _scrollController;
@@ -53,9 +58,11 @@ class _ClientHomeViewState extends State<ClientHomeView> {
   @override
   void initState() {
     super.initState();
+    _getClientHomeBootstrapUseCase = locator<GetClientHomeBootstrapUseCase>();
     _getClientHomeSectionsUseCase = locator<GetClientHomeSectionsUseCase>();
     _getClientCartItemsUseCase = locator<GetClientCartItemsUseCase>();
-    _getClientOrdersUseCase = locator<GetClientOrdersUseCase>();
+    _getClientActiveOrderServiceIdsUseCase =
+        locator<GetClientActiveOrderServiceIdsUseCase>();
     _addServiceToCartUseCase = locator<AddServiceToCartUseCase>();
     _tabUiStateService = locator<ClientTabUiStateService>();
     _scrollController = ScrollController(
@@ -82,29 +89,86 @@ class _ClientHomeViewState extends State<ClientHomeView> {
   }
 
   Future<void> _loadHomeSections({required bool showLoader}) async {
+    final ClientQueryCacheService cache = locator<ClientQueryCacheService>();
     if (showLoader) {
-      setState(() => _isLoading = true);
+      final Map<ClientServiceCategory, List<ClientServiceItem>>? cached = cache
+          .getIfPresent<Map<ClientServiceCategory, List<ClientServiceItem>>>(
+            'client_services/home',
+          );
+      final bool hasCachedVisibleData =
+          cached != null &&
+          cached.values.any(
+            (List<ClientServiceItem> items) => items.isNotEmpty,
+          );
+      if (hasCachedVisibleData) {
+        setState(() {
+          _sections = cached;
+          _errorMessage = null;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = true);
+      }
     }
 
     try {
-      final Map<ClientServiceCategory, List<ClientServiceItem>> result =
-          await _getClientHomeSectionsUseCase();
+      final bootstrap = await _getClientHomeBootstrapUseCase();
       if (!mounted) {
         return;
       }
       setState(() {
-        _sections = result;
+        _sections = bootstrap.sections;
         _errorMessage = null;
         _isLoading = false;
         _didRefreshAfterImage403 = false;
+        _cartServiceIds = bootstrap.cartServiceIds;
+        _activeOrderServiceIds = bootstrap.activeServiceIds;
       });
-      _precacheTopHomeImages(result);
+      _precacheTopHomeImages(bootstrap.sections);
+      _tabUiStateService.setCartCount(bootstrap.cartCount);
+      _tabUiStateService.setOrdersCount(bootstrap.ordersCount);
+      _tabUiStateService.markHomeDataReady();
       if (!showLoader) {
         ClientFeedback.showMessage(context, message: 'Inicio actualizado');
       }
-      await _syncClientLocks();
     } catch (error) {
+      try {
+        final Map<ClientServiceCategory, List<ClientServiceItem>> result =
+            await _getClientHomeSectionsUseCase();
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _sections = result;
+          _errorMessage = null;
+          _isLoading = false;
+          _didRefreshAfterImage403 = false;
+        });
+        _precacheTopHomeImages(result);
+        _tabUiStateService.markHomeDataReady();
+        unawaited(_syncClientLocks());
+        if (!showLoader) {
+          ClientFeedback.showMessage(context, message: 'Inicio actualizado');
+        }
+        return;
+      } catch (_) {
+        // keep handling original error
+      }
       if (!mounted) {
+        return;
+      }
+      final bool hasVisibleData = _sections.values.any(
+        (List<ClientServiceItem> items) => items.isNotEmpty,
+      );
+      if (hasVisibleData) {
+        setState(() => _isLoading = false);
+        ClientFeedback.showMessage(
+          context,
+          message: ApiErrorMapper.toUserMessage(
+            error,
+            fallback: 'No se pudo refrescar inicio. Mostrando últimos datos.',
+          ),
+        );
         return;
       }
       setState(() {
@@ -122,22 +186,14 @@ class _ClientHomeViewState extends State<ClientHomeView> {
       return;
     }
     _didRefreshAfterImage403 = true;
+    locator<ClientQueryCacheService>().invalidatePrefix('client_services/');
     await _loadHomeSections(showLoader: false);
   }
 
   Future<void> _syncClientLocks() async {
     final List<ClientCartItem> cartItems = await _getClientCartItemsUseCase();
-    final List<ClientOrderItem> orders = await _getClientOrdersUseCase();
-    final Set<String> activeOrderServiceIds = orders
-        .where(
-          (ClientOrderItem order) =>
-              order.status != ClientOrderStatus.cancelled &&
-              order.status != ClientOrderStatus.completed,
-        )
-        .expand((ClientOrderItem order) => order.items)
-        .map((item) => item.serviceId.trim())
-        .where((String serviceId) => serviceId.isNotEmpty)
-        .toSet();
+    final Set<String> activeOrderServiceIds =
+        await _getClientActiveOrderServiceIdsUseCase();
     if (!mounted) {
       return;
     }
@@ -156,7 +212,8 @@ class _ClientHomeViewState extends State<ClientHomeView> {
         return;
       }
       final Set<String> candidateUrls = <String>{};
-      for (final ClientServiceCategory category in ClientServiceCategory.values) {
+      for (final ClientServiceCategory category
+          in ClientServiceCategory.values) {
         final List<ClientServiceItem> items =
             sections[category] ?? const <ClientServiceItem>[];
         for (final ClientServiceItem item in items) {

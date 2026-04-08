@@ -3,9 +3,10 @@ import 'package:festum/features/client/models/client_order_item.dart';
 import 'package:flutter/material.dart';
 
 class OrderStatusChip extends StatelessWidget {
-  const OrderStatusChip({required this.status, super.key});
+  const OrderStatusChip({required this.status, this.maxWidth, super.key});
 
   final ClientOrderStatus status;
+  final double? maxWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -20,27 +21,35 @@ class OrderStatusChip extends StatelessWidget {
           child: ScaleTransition(scale: animation, child: child),
         );
       },
-      child: Container(
-        key: ValueKey<ClientOrderStatus>(status),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: palette.background,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: palette.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(palette.icon, size: 14, color: palette.foreground),
-            const SizedBox(width: 6),
-            Text(
-              status.label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: palette.foreground,
-                fontWeight: FontWeight.w700,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth ?? double.infinity),
+        child: Container(
+          key: ValueKey<ClientOrderStatus>(status),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: palette.background,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: palette.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(palette.icon, size: 14, color: palette.foreground),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  status.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: palette.foreground,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

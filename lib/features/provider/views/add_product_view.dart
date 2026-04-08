@@ -206,7 +206,7 @@ class AddProductView extends StatelessWidget {
             const SizedBox(height: 16),
           ],
           _buildTextField(
-            'Duracion minima',
+            'Duración mínima',
             '4 horas',
             suffixIcon: Icons.access_time,
             onChanged: model.updateMinDuration,

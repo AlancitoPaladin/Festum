@@ -4,7 +4,9 @@ import 'package:festum/core/network/api_error_mapper.dart';
 import 'package:festum/core/theme/app_colors.dart';
 import 'package:festum/features/client/models/client_order_item.dart';
 import 'package:festum/features/client/models/client_tab.dart';
+import 'package:festum/features/client/services/client_query_cache_service.dart';
 import 'package:festum/features/client/services/client_tab_ui_state_service.dart';
+import 'package:festum/features/client/usecases/get_client_order_by_id_use_case.dart';
 import 'package:festum/features/client/usecases/get_client_orders_use_case.dart';
 import 'package:festum/features/client/usecases/update_client_order_status_use_case.dart';
 import 'package:festum/features/client/widgets/client_feedback.dart';
@@ -24,6 +26,7 @@ class ClientOrdersView extends StatefulWidget {
 
 class _ClientOrdersViewState extends State<ClientOrdersView> {
   late final GetClientOrdersUseCase _getClientOrdersUseCase;
+  late final GetClientOrderByIdUseCase _getClientOrderByIdUseCase;
   late final UpdateClientOrderStatusUseCase _updateClientOrderStatusUseCase;
   late final ClientTabUiStateService _tabUiStateService;
   late final ScrollController _scrollController;
@@ -38,6 +41,7 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
   void initState() {
     super.initState();
     _getClientOrdersUseCase = locator<GetClientOrdersUseCase>();
+    _getClientOrderByIdUseCase = locator<GetClientOrderByIdUseCase>();
     _updateClientOrderStatusUseCase = locator<UpdateClientOrderStatusUseCase>();
     _tabUiStateService = locator<ClientTabUiStateService>();
     _scrollController = ScrollController(
@@ -62,8 +66,20 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
   }
 
   Future<void> _loadOrders({required bool showLoader}) async {
+    final ClientQueryCacheService cache = locator<ClientQueryCacheService>();
     if (showLoader) {
-      setState(() => _isLoading = true);
+      final List<ClientOrderItem>? cached = cache
+          .getIfPresent<List<ClientOrderItem>>('client_orders/items');
+      final bool hasCachedVisibleData = cached != null && cached.isNotEmpty;
+      if (hasCachedVisibleData) {
+        setState(() {
+          _orders = cached;
+          _errorMessage = null;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = true);
+      }
     }
 
     try {
@@ -111,6 +127,19 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
       }
     } catch (error) {
       if (!mounted) {
+        return;
+      }
+      final bool hasVisibleData = _orders.isNotEmpty;
+      if (hasVisibleData) {
+        setState(() => _isLoading = false);
+        ClientFeedback.showMessage(
+          context,
+          message: ApiErrorMapper.toUserMessage(
+            error,
+            fallback:
+                'No se pudieron refrescar las órdenes. Mostrando últimos datos.',
+          ),
+        );
         return;
       }
       setState(() {
@@ -166,50 +195,51 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
         if (_hiddenHistoryOrdersCount > 0)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Expanded(
-                  child: Text(
-                    _showCancelledOrders
-                        ? 'Mostrando historial (incluye canceladas y completadas)'
-                        : 'Ocultando $_hiddenHistoryOrdersCount orden(es) del historial',
-                    style: Theme.of(context).textTheme.bodySmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Text(
+                  _showCancelledOrders
+                      ? 'Mostrando historial (incluye canceladas y completadas)'
+                      : 'Ocultando $_hiddenHistoryOrdersCount orden(es) del historial',
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(width: 10),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _showCancelledOrders = !_showCancelledOrders;
-                    });
-                  },
-                  child: Text(
-                    _showCancelledOrders
-                        ? 'Ocultar finalizadas'
-                        : 'Ver finalizadas',
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _showCancelledOrders = !_showCancelledOrders;
+                      });
+                    },
+                    child: Text(
+                      _showCancelledOrders
+                          ? 'Ocultar finalizadas'
+                          : 'Ver finalizadas',
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         Expanded(
-              child: visibleOrders.isEmpty
-                  ? ClientStatusView.empty(
-                      title: 'No tienes órdenes activas',
-                      message:
-                          'Tus órdenes del historial (canceladas/completadas) están ocultas para mantener limpia esta sección.',
-                      onPrimaryAction: _hiddenHistoryOrdersCount > 0
-                          ? () {
-                              setState(() => _showCancelledOrders = true);
-                            }
-                          : () => context.go(AppRoutes.clientServices),
-                      primaryActionLabel: _hiddenHistoryOrdersCount > 0
-                          ? 'Ver finalizadas'
-                          : 'Explorar servicios',
-                      onRetry: () => _loadOrders(showLoader: true),
-                      retryLabel: 'Actualizar',
+          child: visibleOrders.isEmpty
+              ? ClientStatusView.empty(
+                  title: 'No tienes órdenes activas',
+                  message:
+                      'Tus órdenes del historial (canceladas/completadas) están ocultas para mantener limpia esta sección.',
+                  onPrimaryAction: _hiddenHistoryOrdersCount > 0
+                      ? () {
+                          setState(() => _showCancelledOrders = true);
+                        }
+                      : () => context.go(AppRoutes.clientServices),
+                  primaryActionLabel: _hiddenHistoryOrdersCount > 0
+                      ? 'Ver finalizadas'
+                      : 'Explorar servicios',
+                  onRetry: () => _loadOrders(showLoader: true),
+                  retryLabel: 'Actualizar',
                 )
               : ListView.separated(
                   controller: _scrollController,
@@ -233,25 +263,51 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
                         child: Card(
                           child: ListTile(
                             leading: const Icon(Icons.receipt_long_rounded),
-                            title: Text(
-                              'Orden #${order.id} - ${order.title}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            title: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                Text(
+                                  'Orden #${order.id}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  order.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ],
                             ),
                             subtitle: Padding(
                               padding: const EdgeInsets.only(top: 6),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[
-                                  OrderStatusChip(status: order.status),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Total: ${_resolvedPayableLabel(order)}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                              child: LayoutBuilder(
+                                builder:
+                                    (
+                                      BuildContext context,
+                                      BoxConstraints constraints,
+                                    ) {
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: <Widget>[
+                                          OrderStatusChip(
+                                            status: order.status,
+                                            maxWidth: constraints.maxWidth,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Total: ${_resolvedPayableLabel(order)}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      );
+                                    },
                               ),
                             ),
                             trailing: const Icon(
@@ -294,8 +350,23 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
   }
 
   Future<void> _openOrderDetail(ClientOrderItem order) async {
-    final _OrderPrimaryAction action = _primaryActionFor(order.status);
-    final bool canCancel = order.status.canTransitionTo(
+    ClientOrderItem selectedOrder = order;
+    try {
+      final ClientOrderItem? detailed = await _getClientOrderByIdUseCase(
+        order.id,
+      );
+      if (detailed != null) {
+        selectedOrder = detailed;
+      }
+    } catch (_) {
+      // Fall back to current in-memory order summary.
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final _OrderPrimaryAction action = _primaryActionFor(selectedOrder.status);
+    final bool canCancel = selectedOrder.status.canTransitionTo(
       ClientOrderStatus.cancelled,
     );
     await showModalBottomSheet<void>(
@@ -315,47 +386,55 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  'Orden #${order.id}',
+                  'Orden #${selectedOrder.id}',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  order.title,
+                  selectedOrder.title,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: <Widget>[
-                    Expanded(
+                    Flexible(
                       child: Text(
                         'Estado',
                         style: Theme.of(context).textTheme.bodyMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    OrderStatusChip(status: order.status),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: OrderStatusChip(status: selectedOrder.status),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 _OrderMetaRow(
                   label: 'Total estimado',
-                  value: _resolvedPayableLabel(order),
+                  value: _resolvedPayableLabel(selectedOrder),
                 ),
-                if (order.subtotalCents != null) ...<Widget>[
+                if (selectedOrder.subtotalCents != null) ...<Widget>[
                   _OrderMetaRow(
                     label: 'Subtotal',
-                    value: _formatCurrency(order.subtotalCents!),
+                    value: _formatCurrency(selectedOrder.subtotalCents!),
                   ),
                 ],
-                if (order.serviceFeeCents != null) ...<Widget>[
+                if (selectedOrder.serviceFeeCents != null) ...<Widget>[
                   _OrderMetaRow(
                     label: 'Cargo de servicio',
-                    value: _formatCurrency(order.serviceFeeCents!),
+                    value: _formatCurrency(selectedOrder.serviceFeeCents!),
                   ),
                 ],
-                if (order.taxCents != null) ...<Widget>[
+                if (selectedOrder.taxCents != null) ...<Widget>[
                   _OrderMetaRow(
                     label: 'Impuestos',
-                    value: _formatCurrency(order.taxCents!),
+                    value: _formatCurrency(selectedOrder.taxCents!),
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -364,20 +443,20 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                _buildOrderItemsSection(order),
+                _buildOrderItemsSection(selectedOrder),
                 const SizedBox(height: 16),
                 Text(
                   'Timeline',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                _OrderTimeline(status: order.status),
+                _OrderTimeline(status: selectedOrder.status),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: action.enabled
-                        ? () => _handlePrimaryAction(order)
+                        ? () => _handlePrimaryAction(selectedOrder)
                         : null,
                     icon: Icon(action.icon),
                     label: Text(action.label),
@@ -388,7 +467,7 @@ class _ClientOrdersViewState extends State<ClientOrdersView> {
                   SizedBox(
                     width: double.infinity,
                     child: TextButton.icon(
-                      onPressed: () => _confirmCancelOrder(order),
+                      onPressed: () => _confirmCancelOrder(selectedOrder),
                       icon: const Icon(Icons.cancel_outlined),
                       label: const Text('Cancelar orden'),
                     ),
@@ -1013,10 +1092,18 @@ class _OrderMetaRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: <Widget>[
-          Expanded(
-            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
-          ),
           Flexible(
+            flex: 5,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            flex: 4,
             child: Text(
               value,
               textAlign: TextAlign.end,

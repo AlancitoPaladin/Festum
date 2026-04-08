@@ -11,10 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:stacked/stacked.dart';
 
 class RegistrationView extends StackedView<RegistrationViewModel> {
-  const RegistrationView({
-    required this.role,
-    super.key,
-  });
+  const RegistrationView({required this.role, super.key});
 
   final AccountRole role;
 
@@ -27,12 +24,14 @@ class RegistrationView extends StackedView<RegistrationViewModel> {
     final bool isProvider = role == AccountRole.provider;
 
     return AuthShell(
-      middleGradientColor:
-          isProvider ? AppColors.primaryButton : AppColors.backgroundElevated,
-      headerIcon:
-          isProvider ? Icons.business_center_rounded : Icons.person_rounded,
+      middleGradientColor: isProvider
+          ? AppColors.primaryButton
+          : AppColors.backgroundElevated,
+      headerIcon: isProvider
+          ? Icons.business_center_rounded
+          : Icons.person_rounded,
       headerTitle: isProvider ? 'Registro de proveedor' : 'Registro de cliente',
-      headerSubtitle: 'Completa tus datos para continuar a inicio de sesión.',
+      headerSubtitle: 'Completa tus datos para continuar e iniciar sesión.',
       maxWidth: 580,
       child: Form(
         key: viewModel.formKey,
@@ -121,7 +120,9 @@ class RegistrationView extends StackedView<RegistrationViewModel> {
             ),
             const SizedBox(height: 10),
             TextButton(
-              onPressed: viewModel.isBusy ? null : () => context.go(AppRoutes.login),
+              onPressed: viewModel.isBusy
+                  ? null
+                  : () => context.go(AppRoutes.login),
               child: const Text('Ya tengo una cuenta'),
             ),
           ],
@@ -151,22 +152,19 @@ class RegistrationView extends StackedView<RegistrationViewModel> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppColors.alert,
-        content: Text(error),
-      ),
+      SnackBar(backgroundColor: AppColors.alert, content: Text(error)),
     );
   }
 
   @override
   RegistrationViewModel viewModelBuilder(BuildContext context) =>
       RegistrationViewModel(
-          role,
-          locator(),
-          locator(),
-          locator(),
-          locator(),
-          locator(),
-          locator(),
-        );
+        role,
+        locator(),
+        locator(),
+        locator(),
+        locator(),
+        locator(),
+        locator(),
+      );
 }

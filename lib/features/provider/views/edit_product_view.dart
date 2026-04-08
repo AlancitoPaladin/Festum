@@ -89,7 +89,10 @@ class EditProductView extends StatelessWidget {
               backgroundColor: Colors.transparent,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: AppColors.primaryText),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: AppColors.primaryText,
+                ),
                 onPressed: () async {
                   final bool allowExit = await _handleExit(context, model);
                   if (!context.mounted || !allowExit) {
@@ -156,12 +159,14 @@ class EditProductView extends StatelessWidget {
                     onPublish: () => _changeStatus(
                       context,
                       model.publish,
-                      successMessage: 'Estado listo. Guarda cambios para aplicarlo.',
+                      successMessage:
+                          'Estado listo. Guarda cambios para aplicarlo.',
                     ),
                     onInactivate: () => _changeStatus(
                       context,
                       model.inactivate,
-                      successMessage: 'Estado listo. Guarda cambios para aplicarlo.',
+                      successMessage:
+                          'Estado listo. Guarda cambios para aplicarlo.',
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -362,7 +367,7 @@ class EditProductView extends StatelessWidget {
                 Expanded(
                   child: _buildTextField(
                     'Tiempo de entrega',
-                    '15 dias',
+                    '15 días',
                     initialValue: data.deliveryTime,
                     onChanged: model.updateDeliveryTime,
                     inputKind: ProviderFieldInputKind.mixedText,
@@ -373,7 +378,7 @@ class EditProductView extends StatelessWidget {
             const SizedBox(height: 16),
           ],
           _buildTextField(
-            'Duracion minima',
+            'Duración mínima',
             '4 horas',
             initialValue: data.minDuration,
             suffixIcon: Icons.access_time,
@@ -463,7 +468,7 @@ class EditProductView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _buildTextField(
-            'Menu incluido',
+            'Menú incluido',
             '...',
             initialValue: data.menuIncluded,
             maxLines: 2,
@@ -487,7 +492,7 @@ class EditProductView extends StatelessWidget {
         return _buildCard([
           _buildTextField(
             'Nombre del salón',
-            'Salon Imperial',
+            'Salón Imperial',
             initialValue: data.name,
             onChanged: model.updateName,
             inputKind: ProviderFieldInputKind.title,
@@ -495,7 +500,7 @@ class EditProductView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _buildTextField(
-            'Capacidad maxima',
+            'Capacidad máxima',
             '200',
             initialValue: data.venueCapacity,
             onChanged: model.updateVenueCapacity,

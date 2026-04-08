@@ -1,5 +1,6 @@
 import 'package:festum/features/provider/models/booking.dart';
 import 'package:festum/features/provider/models/service_category.dart';
+import 'package:festum/core/network/image_json_resolver.dart';
 
 typedef ReservationBookingSummary = Booking;
 
@@ -34,8 +35,9 @@ class ProductReservationSummary {
       category: ServiceCategory.fromProviderApiValue(
         (json['category'] ?? '').toString(),
       ),
-      imageUrl: _resolveImageUrl(
+      imageUrl: resolveImageUrlForUseCaseFromJson(
         json,
+        useCase: ResolvedImageUseCase.list,
         directKeys: const <String>['image_url', 'main_image_url'],
         objectKeys: const <String>['image', 'main_image'],
         listKeys: const <String>['images', 'image_urls'],
@@ -133,55 +135,4 @@ int _toInt(Object? value) {
   }
 
   return int.tryParse(value?.toString() ?? '') ?? 0;
-}
-
-String _resolveImageUrl(
-  Map<String, dynamic> json, {
-  required List<String> directKeys,
-  required List<String> objectKeys,
-  required List<String> listKeys,
-}) {
-  for (final String key in directKeys) {
-    final String value = (json[key] ?? '').toString().trim();
-    if (value.isNotEmpty) {
-      return value;
-    }
-  }
-
-  for (final String key in objectKeys) {
-    final dynamic raw = json[key];
-    if (raw is Map) {
-      final Map<String, dynamic> object = Map<String, dynamic>.from(raw);
-      final String value = (object['url'] ?? object['image_url'] ?? '')
-          .toString()
-          .trim();
-      if (value.isNotEmpty) {
-        return value;
-      }
-    }
-  }
-
-  for (final String key in listKeys) {
-    final dynamic raw = json[key];
-    if (raw is List && raw.isNotEmpty) {
-      final dynamic first = raw.first;
-      if (first is String) {
-        final String value = first.trim();
-        if (value.isNotEmpty) {
-          return value;
-        }
-      }
-      if (first is Map) {
-        final Map<String, dynamic> object = Map<String, dynamic>.from(first);
-        final String value = (object['url'] ?? object['image_url'] ?? '')
-            .toString()
-            .trim();
-        if (value.isNotEmpty) {
-          return value;
-        }
-      }
-    }
-  }
-
-  return '';
 }

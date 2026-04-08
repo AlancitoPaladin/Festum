@@ -62,10 +62,12 @@ class ProviderBusinessProfile {
       facebook: (source['facebook'] ?? '').toString(),
       website: (source['website'] ?? '').toString(),
       logoUrl: logo?.url.isNotEmpty == true ? logo!.url : fallbackLogoUrl,
-      photoUrls: _resolveVisiblePhotoUrls(
-        photos: photos,
-        fallbackPhotoUrls: fallbackPhotoUrls,
-      ),
+      photoUrls: photos.isNotEmpty
+          ? photos
+                .where((ProviderSignedAsset item) => item.url.isNotEmpty)
+                .map((ProviderSignedAsset item) => item.url)
+                .toList()
+          : fallbackPhotoUrls,
       createdAt: _parseDateTime(
         source['created_at'] ?? source['createdAt'] ?? source['member_since'],
       ),
@@ -77,12 +79,12 @@ class ProviderBusinessProfile {
   static ProviderSignedAsset? _parseLogo(Map<String, dynamic> source) {
     final dynamic logo = source['logo'];
     if (logo is Map<String, dynamic>) {
-      final ProviderSignedAsset parsed = _parseSignedAssetPayload(logo);
+      final ProviderSignedAsset parsed = ProviderSignedAsset.fromJson(logo);
       if (parsed.hasUrl || parsed.key.isNotEmpty) {
         return parsed;
       }
     } else if (logo is Map) {
-      final ProviderSignedAsset parsed = _parseSignedAssetPayload(
+      final ProviderSignedAsset parsed = ProviderSignedAsset.fromJson(
         Map<String, dynamic>.from(logo),
       );
       if (parsed.hasUrl || parsed.key.isNotEmpty) {
@@ -116,10 +118,12 @@ class ProviderBusinessProfile {
       return rawPhotos
           .map((dynamic item) {
             if (item is Map<String, dynamic>) {
-              return _parseSignedAssetPayload(item);
+              return ProviderSignedAsset.fromJson(item);
             }
             if (item is Map) {
-              return _parseSignedAssetPayload(Map<String, dynamic>.from(item));
+              return ProviderSignedAsset.fromJson(
+                Map<String, dynamic>.from(item),
+              );
             }
             if (item is String && item.trim().isNotEmpty) {
               final String safeUrl = sanitizeAssetUrl(item);
@@ -153,53 +157,6 @@ class ProviderBusinessProfile {
     }
 
     return const <ProviderSignedAsset>[];
-  }
-
-  static List<String> _resolveVisiblePhotoUrls({
-    required List<ProviderSignedAsset> photos,
-    required List<String> fallbackPhotoUrls,
-  }) {
-    final List<String> signedPhotoUrls = photos
-        .where((ProviderSignedAsset item) => item.url.isNotEmpty)
-        .map((ProviderSignedAsset item) => item.url)
-        .toList();
-
-    if (signedPhotoUrls.isNotEmpty) {
-      return signedPhotoUrls;
-    }
-
-    return fallbackPhotoUrls;
-  }
-
-  static ProviderSignedAsset _parseSignedAssetPayload(
-    Map<String, dynamic> payload,
-  ) {
-    final ProviderSignedAsset parsed = ProviderSignedAsset.fromJson(payload);
-    if (parsed.hasUrl) {
-      return parsed;
-    }
-
-    final String resolvedUrl = resolveImageUrlFromJson(
-      payload,
-      directKeys: const <String>[
-        'url',
-        'image_url',
-        'asset_url',
-        'logo_url',
-      ],
-      objectKeys: const <String>['asset', 'image', 'logo', 'main_image'],
-      listKeys: const <String>[],
-    );
-
-    if (resolvedUrl.isEmpty) {
-      return parsed;
-    }
-
-    return ProviderSignedAsset(
-      key: parsed.key,
-      url: resolvedUrl,
-      expiresAt: parsed.expiresAt,
-    );
   }
 
   static Map<String, dynamic> _resolveSource(Map<String, dynamic> json) {

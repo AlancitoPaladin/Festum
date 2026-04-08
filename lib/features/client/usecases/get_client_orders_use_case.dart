@@ -6,7 +6,7 @@ class GetClientOrdersUseCase {
 
   final ClientOrdersRepository _repository;
 
-  Future<List<ClientOrderItem>> call() {
-    return _repository.getOrders();
+  Future<List<ClientOrderItem>> call({bool includeItems = false}) {
+    return _repository.getOrders(includeItems: includeItems);
   }
 }

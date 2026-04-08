@@ -106,3 +106,7 @@ flutter analyze
 
 - Session validation is skipped in debug when using a local API to avoid forced sign-out if the backend is offline.
 - Current pricing and content are mock data and will be replaced when backend integration is enabled.
+- Image strategy now supports backend variants (`thumb`, `medium`, `original`) with legacy fallback:
+  - List/Home/Cards: `thumb -> medium -> base -> legacy`.
+  - Detail: `medium -> base -> original -> legacy`.
+  - Fullscreen/Zoom: `original -> medium -> base -> legacy`.

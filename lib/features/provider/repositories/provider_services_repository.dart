@@ -94,7 +94,8 @@ class ProviderServicesRepository {
     if (error is DioException) {
       if (error.response?.statusCode == 413) {
         return const ProviderRequestError(
-          message: 'La imagen es demasiado pesada. Intenta con una foto mas ligera.',
+          message:
+              'La imagen es demasiado pesada. Intenta con una foto más ligera.',
         );
       }
 

@@ -70,7 +70,11 @@ class ProviderProduct {
     return sanitizeAssetUrl(
       mainImage?.resolvedImageUrl.isNotEmpty == true
           ? mainImage!.resolvedImageUrl
-          : (image?.url.trim().isNotEmpty == true ? image!.url : mainImageUrl),
+          : image?.urlForUseCase(
+                  ResolvedImageUseCase.list,
+                  fallback: mainImageUrl,
+                ) ??
+                mainImageUrl,
     );
   }
 
@@ -143,7 +147,9 @@ class ProviderProduct {
       'main_image_url': mainImageUrl,
       'image_urls': imageUrls,
       if (image != null) 'image': image!.toJson(),
-      'images': images.map((ProviderProductImage item) => item.toJson()).toList(),
+      'images': images
+          .map((ProviderProductImage item) => item.toJson())
+          .toList(),
       'details': details,
       'inclusions': inclusions,
       'policies': policies,
@@ -238,27 +244,21 @@ class ProviderProduct {
 
     if (parsed.isEmpty && imagePayload != null) {
       parsed.add(
-        ProviderProductImage.fromJson(
-          <String, dynamic>{
-            'image': imagePayload,
-            'image_url': imagePayload['url'],
-            'key': imagePayload['key'],
-            'is_main': true,
-          },
-          fallbackIsMain: true,
-        ),
+        ProviderProductImage.fromJson(<String, dynamic>{
+          'image': imagePayload,
+          'image_url': imagePayload['url'],
+          'key': imagePayload['key'],
+          'is_main': true,
+        }, fallbackIsMain: true),
       );
     }
 
     if (parsed.isEmpty && legacyMainImageUrl.isNotEmpty) {
       parsed.add(
-        ProviderProductImage.fromJson(
-          <String, dynamic>{
-            'image_url': legacyMainImageUrl,
-            'is_main': true,
-          },
-          fallbackIsMain: true,
-        ),
+        ProviderProductImage.fromJson(<String, dynamic>{
+          'image_url': legacyMainImageUrl,
+          'is_main': true,
+        }, fallbackIsMain: true),
       );
     }
 
@@ -270,17 +270,15 @@ class ProviderProduct {
         continue;
       }
       parsed.add(
-        ProviderProductImage.fromJson(
-          <String, dynamic>{
-            'image_url': imageUrl,
-            'is_main': parsed.isEmpty,
-          },
-          fallbackIsMain: parsed.isEmpty,
-        ),
+        ProviderProductImage.fromJson(<String, dynamic>{
+          'image_url': imageUrl,
+          'is_main': parsed.isEmpty,
+        }, fallbackIsMain: parsed.isEmpty),
       );
     }
 
-    if (parsed.isNotEmpty && !parsed.any((ProviderProductImage item) => item.isMain)) {
+    if (parsed.isNotEmpty &&
+        !parsed.any((ProviderProductImage item) => item.isMain)) {
       parsed[0] = parsed[0].copyWith(isMain: true);
     }
 
@@ -289,10 +287,7 @@ class ProviderProduct {
 }
 
 class ProviderProductsResponse {
-  const ProviderProductsResponse({
-    required this.items,
-    required this.total,
-  });
+  const ProviderProductsResponse({required this.items, required this.total});
 
   final List<ProviderProduct> items;
   final int total;

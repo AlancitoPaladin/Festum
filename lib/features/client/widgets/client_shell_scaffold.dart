@@ -53,6 +53,7 @@ class _ClientShellScaffoldState extends State<ClientShellScaffold> {
   bool _isSyncingNotifications = false;
   int _consecutivePollingFailures = 0;
   bool _isAppInForeground = true;
+  bool _initialPollingPending = false;
   late final _LifecycleObserver _lifecycleObserver;
 
   @override
@@ -65,6 +66,10 @@ class _ClientShellScaffoldState extends State<ClientShellScaffold> {
         }
         if (state == AppLifecycleState.resumed) {
           _isAppInForeground = true;
+          if (_initialPollingPending ||
+              (_ordersPollingTimer?.isActive ?? false)) {
+            return;
+          }
           _ordersPollingTimer?.cancel();
           _runPollingCycle();
           return;
@@ -80,12 +85,17 @@ class _ClientShellScaffoldState extends State<ClientShellScaffold> {
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _tabUiStateService = locator<ClientTabUiStateService>();
     _getClientOrdersUseCase = locator<GetClientOrdersUseCase>();
-    _runPollingCycle();
+    _tabUiStateService.addListener(_onTabUiStateChanged);
+    if (widget.currentTab != ClientTab.services ||
+        _tabUiStateService.homeDataReady) {
+      _scheduleInitialPolling();
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    _tabUiStateService.removeListener(_onTabUiStateChanged);
     _ordersPollingTimer?.cancel();
     super.dispose();
   }
@@ -236,10 +246,27 @@ class _ClientShellScaffoldState extends State<ClientShellScaffold> {
     return false;
   }
 
+  void _onTabUiStateChanged() {
+    if (!mounted || !_isAppInForeground) {
+      return;
+    }
+    if (widget.currentTab != ClientTab.services) {
+      return;
+    }
+    if (!_tabUiStateService.homeDataReady) {
+      return;
+    }
+    if (_initialPollingPending || (_ordersPollingTimer?.isActive ?? false)) {
+      return;
+    }
+    _scheduleInitialPolling();
+  }
+
   void _onTabPressed(ClientTab tab) {
     if (tab == widget.currentTab) {
       return;
     }
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     context.go(tab.route);
   }
 
@@ -264,6 +291,7 @@ class _ClientShellScaffoldState extends State<ClientShellScaffold> {
     if (!mounted || !_isAppInForeground) {
       return;
     }
+    _initialPollingPending = false;
     final bool success = await _syncOrderNotifications();
     if (!mounted) {
       return;
@@ -274,6 +302,17 @@ class _ClientShellScaffoldState extends State<ClientShellScaffold> {
       _consecutivePollingFailures += 1;
     }
     _scheduleNextPollingCycle();
+  }
+
+  void _scheduleInitialPolling() {
+    _ordersPollingTimer?.cancel();
+    _initialPollingPending = true;
+    _ordersPollingTimer = Timer(const Duration(seconds: 8), () {
+      if (!mounted || !_isAppInForeground) {
+        return;
+      }
+      _runPollingCycle();
+    });
   }
 
   void _scheduleNextPollingCycle() {
