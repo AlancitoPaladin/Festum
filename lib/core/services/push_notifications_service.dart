@@ -37,6 +37,13 @@ class PushNotificationsService {
 
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
+  static const AndroidNotificationChannel _androidChannel =
+      AndroidNotificationChannel(
+        'festum_domain_events',
+        'Festum updates',
+        description: 'Domain updates for orders and reservations',
+        importance: Importance.high,
+      );
   final LinkedHashSet<String> _processedMessageKeys = LinkedHashSet<String>();
 
   bool _initialized = false;
@@ -114,6 +121,13 @@ class PushNotificationsService {
       settings,
       onDidReceiveNotificationResponse: _onLocalNotificationTap,
     );
+
+    final AndroidFlutterLocalNotificationsPlugin? androidPlugin = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    await androidPlugin?.createNotificationChannel(_androidChannel);
+
     _localNotificationsReady = true;
   }
 
@@ -131,6 +145,12 @@ class PushNotificationsService {
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
       debugPrint('Push notifications permission denied.');
     }
+
+    await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
   }
 
   Future<void> _configureMessageHandlers() async {
@@ -155,12 +175,27 @@ class PushNotificationsService {
     if (!_firebaseReady || !_authStateService.isAuthenticated) {
       return;
     }
+    await _ensurePlatformPushTokenReady();
     final String? token = await FirebaseMessaging.instance.getToken();
     _deviceToken = token;
     if (token == null || token.trim().isEmpty) {
       return;
     }
     await _registerDeviceToken(token, force: force);
+  }
+
+  Future<void> _ensurePlatformPushTokenReady() async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) {
+      return;
+    }
+
+    for (int attempt = 0; attempt < 5; attempt++) {
+      final String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+      if (apnsToken != null && apnsToken.trim().isNotEmpty) {
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    }
   }
 
   Future<void> _registerDeviceToken(String token, {bool force = false}) async {
@@ -219,14 +254,13 @@ class PushNotificationsService {
       return;
     }
 
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'festum_domain_events',
-          'Festum updates',
-          channelDescription: 'Domain updates for orders and reservations',
-          importance: Importance.high,
-          priority: Priority.high,
-        );
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'festum_domain_events',
+      'Festum updates',
+      channelDescription: 'Domain updates for orders and reservations',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails();
     const NotificationDetails notificationDetails = NotificationDetails(
       android: androidDetails,

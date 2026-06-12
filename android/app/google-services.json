@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "514698603301",
+    "project_id": "festumdb-8118a-e8052",
+    "storage_bucket": "festumdb-8118a-e8052.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:514698603301:android:30dbe8a68e5c42de5ec8cc",
+        "android_client_info": {
+          "package_name": "com.example.festum"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDayfZb6ooTjCH_IGvzMZnuNCobeYlrYIk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

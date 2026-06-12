@@ -1,84 +1,110 @@
 # Festum
 
-Festum is a Flutter application for event services discovery and booking. It provides a client-facing experience with service catalogs, detailed service pages, cart management, and order tracking, built with a clean architecture that separates UI from data sources.
+Festum is a Flutter mobile application for event services discovery, booking, and provider operations. The project includes two connected experiences: a client flow for browsing and ordering services, and a provider flow for managing business information, services, products, reservations, and notifications.
 
-## Project Status
+## Product Scope
 
-- Client flow: implemented with mock data and standardized UI states.
-- Backend: integration pending. The app is prepared with repositories and use cases to connect APIs without rewriting views.
+- Client catalog with category-based discovery
+- Service detail pages with gallery, pricing, and cart actions
+- Cart, order tracking, and order detail timeline
+- Provider dashboard with quick stats and featured services
+- Service and product management for providers
+- Reservation review, manual booking, and booking detail flows
+- Shared visual system for Android and iOS
 
-## Key Features
+## Screenshots
 
-- Client home with category sections.
-- Service detail with gallery, availability mock, and sticky CTA.
-- Cart with payment summary, confirmation, and undo.
-- Orders with timeline and detail modal.
-- Shared bottom navigation with hide/show on scroll.
-- Pull-to-refresh across client screens.
+### Provider Experience
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/provider-home.png" alt="Provider home" width="220"><br>Provider home</td>
+    <td align="center"><img src="docs/screenshots/provider-notifications.png" alt="Provider notifications" width="220"><br>Notifications</td>
+    <td align="center"><img src="docs/screenshots/provider-profile.png" alt="Provider profile" width="220"><br>Profile</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/provider-business-profile.png" alt="Business profile" width="220"><br>Business profile</td>
+    <td align="center"><img src="docs/screenshots/provider-services.png" alt="Provider services" width="220"><br>Services</td>
+    <td align="center"><img src="docs/screenshots/provider-products.png" alt="Provider products" width="220"><br>Products</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/provider-create-service.png" alt="Create service" width="220"><br>Create service</td>
+    <td align="center"><img src="docs/screenshots/provider-edit-service.png" alt="Edit service" width="220"><br>Edit service</td>
+    <td align="center"><img src="docs/screenshots/provider-reservations.png" alt="Provider reservations" width="220"><br>Reservations</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/provider-booking-detail.png" alt="Booking detail" width="220"><br>Booking detail</td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
+
+### Client Experience
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/client-home.png" alt="Client home" width="220"><br>Client home</td>
+    <td align="center"><img src="docs/screenshots/client-service-detail.png" alt="Client service detail" width="220"><br>Service detail</td>
+    <td align="center"><img src="docs/screenshots/client-cart.png" alt="Client cart" width="220"><br>Cart</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/client-orders.png" alt="Client orders" width="220"><br>Orders</td>
+    <td align="center"><img src="docs/screenshots/client-order-detail.png" alt="Client order detail" width="220"><br>Order detail</td>
+    <td></td>
+  </tr>
+</table>
 
 ## Architecture
 
-- Views are decoupled from data via repositories and use cases.
-- Shared tab UI state for badges and scroll position.
-- Reusable UI primitives for empty/loading/error states and feedback.
+- `lib/features/client`: client-side views, repositories, state, and use cases
+- `lib/features/provider`: provider-side dashboard, services, products, and reservations
+- `lib/core`: routing, environment configuration, shared services, theme, and networking
+- `lib/app`: application shell and route registration
 
-## Requirements
-
-- Flutter (stable channel)
-- Dart (bundled with Flutter)
+The codebase follows a feature-oriented structure with repositories and use cases separating UI from API integration.
 
 ## Configuration
 
-Supported `--dart-define` values:
-
-- `APP_ENV`: `dev` | `staging` | `prod`
-- `API_BASE_URL`: URL override for any environment
-- `USE_CLIENT_MOCKS`: `true` | `false`
+The application supports local and production API environments through `API_BASE_URL`.
 
 Resolution order:
 
-1. `API_BASE_URL` (highest priority)
-2. `APP_ENV`
-3. Local defaults (`dev`):
-   - Android emulator: `http://10.0.2.2:8000`
-   - iOS simulator/macOS: `http://127.0.0.1:8000`
+1. `API_BASE_URL` from `--dart-define`
+2. Internal defaults by platform and build mode
 
-Environment defaults:
+Current defaults:
 
-- `APP_ENV=dev` -> local defaults
-- `APP_ENV=staging` -> `https://staging-api.example.com`
-- `APP_ENV=prod` -> `https://api.example.com`
+- Android emulator: `http://10.0.2.2:8000`
+- iOS simulator: `http://127.0.0.1:8000`
+- Release builds: `http://18.219.37.43`
 
-Useful examples:
+Examples:
 
 ```bash
-# Android emulator + local API
-flutter run --dart-define=APP_ENV=dev --dart-define=API_BASE_URL=http://10.0.2.2:8000
-
-# iOS simulator + local API
-flutter run --dart-define=APP_ENV=dev --dart-define=API_BASE_URL=http://127.0.0.1:8000
-
-# Device (Android/iOS) + cloud API
-flutter run --dart-define=APP_ENV=prod --dart-define=API_BASE_URL=https://api.tudominio.com
-
-# Force real API (no mocks)
-flutter run --dart-define=APP_ENV=dev --dart-define=USE_CLIENT_MOCKS=false
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
+flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8000
+flutter run --dart-define=API_BASE_URL=http://18.219.37.43
 ```
 
-### iOS Xcode (sin `--dart-define`)
+### Xcode
 
-El proyecto ya incluye defines por configuración:
+The iOS project includes multiple build configurations:
 
-- `Debug` -> `APP_ENV=dev`, `USE_CLIENT_MOCKS=false`
-- `Release/Profile` -> `APP_ENV=prod`, `USE_CLIENT_MOCKS=false`
+- `Debug`
+- `Release`
+- `Profile`
+- `Staging`
 
-En Xcode:
+Use `Runner` for standard local development and `Runner-Staging` when you want the shared staging scheme.
 
-1. `Product -> Scheme -> Edit Scheme...`
-2. Para `Run` usa `Build Configuration: Debug`.
-3. Para `Archive` usa `Build Configuration: Release`.
-4. Para pruebas contra staging, usa `Build Configuration: Staging` en `Run` o `Archive`.
-5. También puedes seleccionar el scheme compartido `Runner-Staging` para no cambiar la configuración manualmente.
+## Firebase
+
+Android and iOS Firebase configuration files are expected in:
+
+- `android/app/google-services.json`
+- `ios/Runner/GoogleService-Info.plist`
+
+Push notifications are fully prepared on Android. For real iOS push notifications on a physical device, Apple Developer Program access and APNs configuration are still required.
 
 ## Run
 
@@ -87,26 +113,21 @@ flutter pub get
 flutter run
 ```
 
-## Static Analysis
+## Validation
 
 ```bash
 flutter analyze
 ```
 
-## Relevant Structure
+## Platform Scope
 
-- `lib/features/client/views` client screens
-- `lib/features/client/repositories` data contracts
-- `lib/features/client/repositories/mock` mock implementations
-- `lib/features/client/usecases` use cases
-- `lib/features/client/widgets` reusable components
-- `lib/core/theme` theme and colors
+This repository is currently focused on mobile delivery:
+
+- Android
+- iOS
 
 ## Notes
 
-- Session validation is skipped in debug when using a local API to avoid forced sign-out if the backend is offline.
-- Current pricing and content are mock data and will be replaced when backend integration is enabled.
-- Image strategy now supports backend variants (`thumb`, `medium`, `original`) with legacy fallback:
-  - List/Home/Cards: `thumb -> medium -> base -> legacy`.
-  - Detail: `medium -> base -> original -> legacy`.
-  - Fullscreen/Zoom: `original -> medium -> base -> legacy`.
+- The local development flow is optimized for emulator and simulator testing.
+- The project already integrates real API flows for client and provider modules.
+- Image handling supports backend variants with graceful fallback for older payloads.
