@@ -45,6 +45,7 @@ app.*.map.json
 # Android
 **/android/local.properties
 **/android/key.properties
+android/app/google-services.json
 *.jks
 *.keystore
 
@@ -53,6 +54,7 @@ app.*.map.json
 .env.*
 !.env.example
 !.env.template
+ios/Runner/GoogleService-Info.plist
 
 # Xcode / CocoaPods local user data
 **/xcuserdata/

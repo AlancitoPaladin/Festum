@@ -104,6 +104,8 @@ Android and iOS Firebase configuration files are expected in:
 - `android/app/google-services.json`
 - `ios/Runner/GoogleService-Info.plist`
 
+These files are intentionally kept out of version control. Each developer must add their own local Firebase configuration files before running notification flows on device or simulator.
+
 Push notifications are fully prepared on Android. For real iOS push notifications on a physical device, Apple Developer Program access and APNs configuration are still required.
 
 ## Run
